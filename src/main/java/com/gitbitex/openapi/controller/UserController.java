@@ -62,7 +62,7 @@ public class UserController {
 
         String token = userManager.generateAccessToken(user, request.getSession().getId());
 
-        addAccessTokenCookie(response, token);
+     //   addAccessTokenCookie(response, token);
 
         TokenDto tokenDto = new TokenDto();
         tokenDto.setToken(token);
