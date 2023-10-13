@@ -27,18 +27,23 @@ public class UserController {
     private final MatchingEngineCommandProducer matchingEngineCommandProducer;
 
     @GetMapping("/users/self")
-    public UserDto getCurrentUser(@RequestAttribute(required = false) User currentUser) {
+    public UserResponse getCurrentUser(@RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            //    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            // Return a UserResponse with an empty body and OK status for unauthenticated users
+            return new UserResponse(null);
         }
-        return userDto(currentUser);
+
+        // Return a UserResponse with the authenticated user and OK status
+        return new UserResponse(currentUser);
     }
+
 
     @PutMapping("/users/self")
     public UserDto updateProfile(@RequestBody UpdateProfileRequest updateProfileRequest,
                                  @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+         //   throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
 
         if (updateProfileRequest.getNickName() != null) {
@@ -62,7 +67,7 @@ public class UserController {
 
         String token = userManager.generateAccessToken(user, request.getSession().getId());
 
-     //   addAccessTokenCookie(response, token);
+        addAccessTokenCookie(response, token);
 
         TokenDto tokenDto = new TokenDto();
         tokenDto.setToken(token);
