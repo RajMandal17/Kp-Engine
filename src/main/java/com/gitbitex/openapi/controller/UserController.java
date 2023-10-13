@@ -51,7 +51,7 @@ public class UserController {
 
         return userDto(currentUser);
     }
-/*
+
     @PostMapping("/users/accessToken")
     public TokenDto signIn(@RequestBody @Valid SignInRequest signInRequest, HttpServletRequest request,
                            HttpServletResponse response) {
@@ -69,7 +69,7 @@ public class UserController {
         tokenDto.setTwoStepVerification("none");
         return tokenDto;
     }
-*/
+
     @DeleteMapping("/users/accessToken")
     public void signOut(@RequestAttribute(required = false) User currentUser,
                         @RequestAttribute(required = false) String accessToken) {
