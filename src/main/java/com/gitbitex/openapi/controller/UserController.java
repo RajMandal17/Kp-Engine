@@ -26,6 +26,16 @@ public class UserController {
     private final UserRepository userRepository;
     private final MatchingEngineCommandProducer matchingEngineCommandProducer;
 
+
+
+
+    /*    @GetMapping("/users/self")
+    public UserDto getCurrentUser(@RequestAttribute(required = false) User currentUser) {
+        if (currentUser == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        return userDto(currentUser);
+    }*/
     @GetMapping("/users/self")
     public UserResponse getCurrentUser(@RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
@@ -38,12 +48,11 @@ public class UserController {
         return new UserResponse(currentUser);
     }
 
-
-    @PutMapping("/users/self")
+ /*   @PutMapping("/users/self")
     public UserDto updateProfile(@RequestBody UpdateProfileRequest updateProfileRequest,
                                  @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-         //   throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
 
         if (updateProfileRequest.getNickName() != null) {
@@ -56,6 +65,26 @@ public class UserController {
 
         return userDto(currentUser);
     }
+*/
+ @PutMapping("/users/self")
+ public UpdateProfileResponse updateProfile(@RequestBody UpdateProfileRequest updateProfileRequest,
+                                            @RequestAttribute(required = false) User currentUser) {
+     if (currentUser == null) {
+         // Return an UpdateProfileResponse with an empty body and OK status for unauthenticated users
+         return new UpdateProfileResponse(null);
+     }
+
+     if (updateProfileRequest.getNickName() != null) {
+         currentUser.setNickName(updateProfileRequest.getNickName());
+     }
+     if (updateProfileRequest.getTwoStepVerificationType() != null) {
+         currentUser.setTwoStepVerificationType(updateProfileRequest.getTwoStepVerificationType());
+     }
+     userRepository.save(currentUser);
+
+     // Return an UpdateProfileResponse with the updated user and OK status
+     return new UpdateProfileResponse(currentUser);
+ }
 
     @PostMapping("/users/accessToken")
     public TokenDto signIn(@RequestBody @Valid SignInRequest signInRequest, HttpServletRequest request,

@@ -10,5 +10,5 @@ public class UpdateProfileResponse extends ResponseEntity<User> {
         super(body, HttpStatus.OK); // Set the desired HTTP status, e.g., OK (200)
     }
 
-    // You can add more constructors and methods as needed for customization
+
 }
