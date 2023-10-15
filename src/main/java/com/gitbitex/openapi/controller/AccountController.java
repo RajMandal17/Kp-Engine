@@ -24,7 +24,7 @@ public class AccountController {
     public List<AccountDto> getAccounts(@RequestParam(name = "currency") List<String> currencies,
                                         @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.ACCEPTED);
+            throw new ResponseStatusException(HttpStatus.OK);
         }
 
         List<Account> accounts = accountManager.getAccounts(currentUser.getId());
