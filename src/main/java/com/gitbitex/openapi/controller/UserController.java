@@ -60,12 +60,12 @@ public class UserController {
             throw new ResponseStatusException(HttpStatus.OK, "email or password error");
         }
 
-        String token = userManager.generateAccessToken(user, request.getSession().getId());
+//        String token = userManager.generateAccessToken(user, request.getSession().getId());
 
-        addAccessTokenCookie(response, token);
+ //       addAccessTokenCookie(response, token);
 
         TokenDto tokenDto = new TokenDto();
-        tokenDto.setToken(token);
+  //      tokenDto.setToken(token);
         tokenDto.setTwoStepVerification("none");
         return tokenDto;
     }
