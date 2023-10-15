@@ -40,11 +40,11 @@ public class OrderController {
     public OrderDto placeOrder(@RequestBody @Valid PlaceOrderRequest request,
                                @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
         Product product = productRepository.findById(request.getProductId());
         if (product == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product not found: " + request.getProductId());
+            throw new ResponseStatusException(HttpStatus.ACCEPTED, "product not found: " + request.getProductId());
         }
 
         OrderType type = OrderType.valueOf(request.getType().toUpperCase());
@@ -79,7 +79,7 @@ public class OrderController {
     @SneakyThrows
     public void cancelOrder(@PathVariable String orderId, @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         Order order = orderRepository.findByOrderId(orderId);
@@ -87,7 +87,7 @@ public class OrderController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found: " + orderId);
         }
         if (!order.getUserId().equals(currentUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         CancelOrderCommand command = new CancelOrderCommand();
@@ -100,7 +100,7 @@ public class OrderController {
     @SneakyThrows
     public void cancelOrders(String productId, String side, @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         OrderSide orderSide = side != null ? OrderSide.valueOf(side.toUpperCase()) : null;
@@ -123,7 +123,7 @@ public class OrderController {
                                           @RequestParam(defaultValue = "50") int pageSize,
                                           @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         OrderStatus orderStatus = status != null ? OrderStatus.valueOf(status.toUpperCase()) : null;

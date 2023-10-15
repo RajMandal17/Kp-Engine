@@ -23,7 +23,7 @@ public class AppController {
     @GetMapping("/apps")
     public List<AppDto> getApps(@RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         List<App> apps = appRepository.findByUserId(currentUser.getId());
@@ -33,7 +33,7 @@ public class AppController {
     @PostMapping("/apps")
     public AppDto createApp(CreateAppRequest request, @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         App app = new App();
@@ -50,15 +50,15 @@ public class AppController {
     @DeleteMapping("/apps/{appId}")
     public void deleteApp(@PathVariable String appId, @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         App app = appRepository.findByAppId(appId);
         if (app == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
         if (!app.getUserId().equals(currentUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         appRepository.deleteById(app.getId());

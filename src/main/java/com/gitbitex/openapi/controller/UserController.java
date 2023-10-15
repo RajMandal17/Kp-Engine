@@ -32,7 +32,7 @@ public class UserController {
     /*    @GetMapping("/users/self")
     public UserDto getCurrentUser(@RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
         return userDto(currentUser);
     }*/
@@ -52,7 +52,7 @@ public class UserController {
     public UserDto updateProfile(@RequestBody UpdateProfileRequest updateProfileRequest,
                                  @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         if (updateProfileRequest.getNickName() != null) {
@@ -91,16 +91,16 @@ public class UserController {
                            HttpServletResponse response) {
         User user = userManager.getUser(signInRequest.getEmail(), signInRequest.getPassword());
         if (user == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "email or password error");
+            throw new ResponseStatusException(HttpStatus.ACCEPTED, "email or password error");
         }
 
-        String token = userManager.generateAccessToken(user, request.getSession().getId());
+      //  String token = userManager.generateAccessToken(user, request.getSession().getId());
 
-        addAccessTokenCookie(response, token);
+      //  addAccessTokenCookie(response, token);
 
         TokenDto tokenDto = new TokenDto();
-        tokenDto.setToken(token);
-        tokenDto.setTwoStepVerification("none");
+     //   tokenDto.setToken(token);
+       // tokenDto.setTwoStepVerification("none");
         return tokenDto;
     }
 
@@ -108,7 +108,7 @@ public class UserController {
     public void signOut(@RequestAttribute(required = false) User currentUser,
                         @RequestAttribute(required = false) String accessToken) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.ACCEPTED);
         }
 
         userManager.deleteAccessToken(accessToken);
