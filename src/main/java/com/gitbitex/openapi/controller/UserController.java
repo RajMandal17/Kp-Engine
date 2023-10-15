@@ -51,7 +51,7 @@ public class UserController {
 
         return userDto(currentUser);
     }
-
+/*
     @PostMapping("/users/accessToken")
     public TokenDto signIn(@RequestBody @Valid SignInRequest signInRequest, HttpServletRequest request,
                            HttpServletResponse response) {
@@ -79,7 +79,7 @@ public class UserController {
 
         userManager.deleteAccessToken(accessToken);
     }
-
+*/
     @PostMapping("/users")
     public UserDto signUp(@RequestBody @Valid SignUpRequest signUpRequest) {
         User user = userManager.createUser(signUpRequest.getEmail(), signUpRequest.getPassword());
