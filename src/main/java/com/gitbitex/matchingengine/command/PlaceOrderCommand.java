@@ -20,6 +20,7 @@ public class PlaceOrderCommand extends Command {
     private OrderType orderType;
     private OrderSide orderSide;
     private Date time;
+    private String last_trade_id;
 
     public PlaceOrderCommand() {
         this.setType(CommandType.PLACE_ORDER);
