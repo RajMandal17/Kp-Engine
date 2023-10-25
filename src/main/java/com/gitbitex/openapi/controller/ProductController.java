@@ -42,6 +42,7 @@ public class ProductController {
 
         List<TradeDto> tradeDtos = new ArrayList<TradeDto>();
         for (Trade trade : trades) {
+
             tradeDtos.add(tradeDto(trade));
         }
 

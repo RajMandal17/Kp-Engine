@@ -98,7 +98,7 @@ public class OrderController {
         orderDto.setType(String.valueOf(command.getOrderType()));
         orderDto.setSide(String.valueOf(command.getOrderSide()));
         orderDto.setTimeInForce(request.getTimeInForce());
-        orderDto.setStatus(msg.getStatus());
+        orderDto.setStatus("new");
        orderDto.setSettled(msg.isSettled());
         return orderDto;
     }
