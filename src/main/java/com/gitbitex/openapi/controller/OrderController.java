@@ -38,9 +38,9 @@ public class OrderController {
     private final MatchingEngineCommandProducer matchingEngineCommandProducer;
     private final ProductRepository productRepository;
 
-    @PostMapping(value = "/orders")
-    public OrderDto placeOrder(@RequestBody @Valid PlaceOrderRequest request,
-                               @RequestAttribute(required = false) User currentUser) {
+    @PostMapping(value = "/orders/{id}")
+    public OrderDto placeOrder(@RequestBody @Valid PlaceOrderRequest request,@PathVariable String id) {
+
 
         Product product = productRepository.findById(request.getProductId());
         if (product == null) {
@@ -59,7 +59,7 @@ public class OrderController {
         PlaceOrderCommand command = new PlaceOrderCommand();
         command.setProductId(request.getProductId());
         command.setOrderId(UUID.randomUUID().toString());
-        command.setUserId(currentUser.getId());
+        command.setUserId(id.toString());
         command.setOrderType(type);
         command.setOrderSide(side);
         command.setSize(size);
@@ -78,7 +78,7 @@ public class OrderController {
         orderDto.setCreatedAt(String.valueOf(command.getTime()));
         orderDto.setProductId(command.getProductId());
         orderDto.setUserId(command.getUserId());
-        orderDto.setUpdatedAt(String.valueOf(currentUser.getUpdatedAt()));
+        //orderDto.setUpdatedAt(String.valueOf(currentUser.getUpdatedAt()));
        orderDto.setClientOid(request.getClientOid());
         orderDto.setSize(String.valueOf(command.getSize()));
         orderDto.setFunds(String.valueOf(command.getFunds()));

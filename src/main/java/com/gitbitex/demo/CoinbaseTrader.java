@@ -97,7 +97,8 @@ public class CoinbaseTrader {
         order.setFunds(String.valueOf(new Random().nextInt(10) + 1));
         order.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
         order.setType("limit");
-        orderController.placeOrder(order, user);
+        String objectAsString = user.toString();
+        orderController.placeOrder(order, objectAsString);
     }
 
     @Getter
@@ -156,7 +157,8 @@ public class CoinbaseTrader {
                                 order.setFunds(message.getFunds());
                                 order.setSide(message.getSide().toLowerCase());
                                 order.setType("limit");
-                                orderController.placeOrder(order, user);
+                                String objectAsString = user.toString();
+                                orderController.placeOrder(order, objectAsString);
                             }
                             break;
                         case "done":
