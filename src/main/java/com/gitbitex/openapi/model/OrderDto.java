@@ -7,15 +7,20 @@ import lombok.Setter;
 @Setter
 public class OrderDto {
     private String id;
-    private String price;
+    private String createdAt;
+    private String updatedAt;
+    private String productId;
+    private String UserId;
+    private String clientOid;
     private String size;
     private String funds;
-    private String productId;
-    private String side;
-    private String type;
-    private String createdAt;
-    private String fillFees;
     private String filledSize;
     private String executedValue;
+    private String price;
+    private String  FillFees;
+    private String type;
+    private String side;
+    private String timeInForce;
     private String status;
+    private boolean settled;
 }

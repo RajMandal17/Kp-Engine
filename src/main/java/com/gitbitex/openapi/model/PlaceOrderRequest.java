@@ -21,6 +21,7 @@ public class PlaceOrderRequest {
 
     private String price;
 
+    private String last_trade_id;
     @NotBlank
     private String side;
 

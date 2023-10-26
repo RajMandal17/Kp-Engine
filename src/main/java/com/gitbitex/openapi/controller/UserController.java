@@ -29,7 +29,7 @@ public class UserController {
     @GetMapping("/users/self")
     public UserDto getCurrentUser(@RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.OK);
         }
         return userDto(currentUser);
     }
@@ -38,7 +38,7 @@ public class UserController {
     public UserDto updateProfile(@RequestBody UpdateProfileRequest updateProfileRequest,
                                  @RequestAttribute(required = false) User currentUser) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.OK);
         }
 
         if (updateProfileRequest.getNickName() != null) {
@@ -51,21 +51,21 @@ public class UserController {
 
         return userDto(currentUser);
     }
-
+/*
     @PostMapping("/users/accessToken")
     public TokenDto signIn(@RequestBody @Valid SignInRequest signInRequest, HttpServletRequest request,
                            HttpServletResponse response) {
         User user = userManager.getUser(signInRequest.getEmail(), signInRequest.getPassword());
         if (user == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "email or password error");
+            throw new ResponseStatusException(HttpStatus.OK, "email or password error");
         }
 
-        String token = userManager.generateAccessToken(user, request.getSession().getId());
+//        String token = userManager.generateAccessToken(user, request.getSession().getId());
 
-        addAccessTokenCookie(response, token);
+ //       addAccessTokenCookie(response, token);
 
         TokenDto tokenDto = new TokenDto();
-        tokenDto.setToken(token);
+  //      tokenDto.setToken(token);
         tokenDto.setTwoStepVerification("none");
         return tokenDto;
     }
@@ -74,12 +74,12 @@ public class UserController {
     public void signOut(@RequestAttribute(required = false) User currentUser,
                         @RequestAttribute(required = false) String accessToken) {
         if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.OK);
         }
 
         userManager.deleteAccessToken(accessToken);
     }
-
+*/
     @PostMapping("/users")
     public UserDto signUp(@RequestBody @Valid SignUpRequest signUpRequest) {
         User user = userManager.createUser(signUpRequest.getEmail(), signUpRequest.getPassword());

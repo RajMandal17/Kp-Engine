@@ -7,6 +7,7 @@ import com.gitbitex.marketdata.repository.CandleRepository;
 import com.gitbitex.marketdata.repository.ProductRepository;
 import com.gitbitex.marketdata.repository.TradeRepository;
 import com.gitbitex.matchingengine.OrderBookSnapshotStore;
+import com.gitbitex.matchingengine.message.OrderMatchMessage;
 import com.gitbitex.openapi.model.PagedList;
 import com.gitbitex.openapi.model.ProductDto;
 import com.gitbitex.openapi.model.TradeDto;
@@ -38,8 +39,16 @@ public class ProductController {
     @GetMapping("/api/products/{productId}/trades")
     public List<TradeDto> getProductTrades(@PathVariable String productId) {
         List<Trade> trades = tradeRepository.findByProductId(productId, 50);
-        return trades.stream().map(this::tradeDto).collect(Collectors.toList());
+
+        List<TradeDto> tradeDtos = new ArrayList<TradeDto>();
+        for (Trade trade : trades) {
+
+            tradeDtos.add(tradeDto(trade));
+        }
+
+        return tradeDtos;
     }
+
 
     @GetMapping("/api/products/{productId}/candles")
     public List<List<Object>> getProductCandles(@PathVariable String productId, @RequestParam int granularity,
@@ -84,11 +93,13 @@ public class ProductController {
 
     private TradeDto tradeDto(Trade trade) {
         TradeDto tradeDto = new TradeDto();
+        var message = new OrderMatchMessage();
         tradeDto.setSequence(trade.getSequence());
         tradeDto.setTime(trade.getTime().toInstant().toString());
         tradeDto.setPrice(trade.getPrice().toPlainString());
         tradeDto.setSize(trade.getSize().toPlainString());
         tradeDto.setSide(trade.getSide().name().toLowerCase());
+      //  tradeDto.setTakeruserId();
         return tradeDto;
     }
 }
