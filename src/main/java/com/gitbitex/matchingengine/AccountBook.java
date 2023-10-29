@@ -54,13 +54,13 @@ public class AccountBook {
     }
 
     public void unhold(String userId, String currency, BigDecimal amount, ModifiedObjectList modifiedObjects) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new NullPointerException("amount should greater than 0");
-        }
+//        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+//            throw new NullPointerException("amount should greater than 0");
+//        }
         Account account = getAccount(userId, currency);
-        if (account == null || account.getHold().compareTo(amount) < 0) {
-            throw new NullPointerException("insufficient funds");
-        }
+//        if (account == null || account.getHold().compareTo(amount) < 0) {
+//            throw new NullPointerException("insufficient funds");
+//        }
         account.setAvailable(account.getAvailable().add(amount));
         account.setHold(account.getHold().subtract(amount));
         modifiedObjects.add(account.clone());
@@ -99,10 +99,10 @@ public class AccountBook {
             makerQuoteAccount.setHold(makerQuoteAccount.getHold().subtract(funds));
         }
 
-        validateAccount(takerBaseAccount);
-        validateAccount(takerQuoteAccount);
-        validateAccount(makerBaseAccount);
-        validateAccount(makerQuoteAccount);
+//        validateAccount(takerBaseAccount);
+//        validateAccount(takerQuoteAccount);
+//        validateAccount(makerBaseAccount);
+//        validateAccount(makerQuoteAccount);
 
         modifiedObjects.add(takerBaseAccount.clone());
         modifiedObjects.add(takerQuoteAccount.clone());
