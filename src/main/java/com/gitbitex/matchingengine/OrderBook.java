@@ -43,27 +43,27 @@ public class OrderBook {
 
     public void placeOrder(Order takerOrder, ModifiedObjectList modifiedObjects) {
         var product = productBook.getProduct(productId);
-        if (product == null) {
+         if (product == null) {
             logger.warn("order rejected, reason: PRODUCT_NOT_FOUND");
             return;
         }
 
         takerOrder.setSequence(++orderSequence);
 
-        if (takerOrder.getSide() == OrderSide.BUY) {
-            accountBook.hold(takerOrder.getUserId(), product.getQuoteCurrency(), takerOrder.getRemainingFunds(),
-                    modifiedObjects);
-        } else {
-            accountBook.hold(takerOrder.getUserId(), product.getBaseCurrency(), takerOrder.getRemainingSize(),
-                    modifiedObjects);
-        }
-        if (modifiedObjects.isEmpty()) {
-            logger.warn("order rejected, reason: INSUFFICIENT_FUNDS: {}", JSON.toJSONString(takerOrder));
-            takerOrder.setStatus(OrderStatus.REJECTED);
-            modifiedObjects.add(takerOrder);
-            modifiedObjects.add(orderBookState());
-            return;
-        }
+//        if (takerOrder.getSide() == OrderSide.BUY) {
+//            accountBook.hold(takerOrder.getUserId(), product.getQuoteCurrency(), takerOrder.getRemainingFunds(),
+//                    modifiedObjects);
+//        } else {
+//            accountBook.hold(takerOrder.getUserId(), product.getBaseCurrency(), takerOrder.getRemainingSize(),
+//                    modifiedObjects);
+//        }
+//        if (modifiedObjects.isEmpty()) {
+//            logger.warn("order rejected, reason: INSUFFICIENT_FUNDS: {}", JSON.toJSONString(takerOrder));
+//            takerOrder.setStatus(OrderStatus.REJECTED);
+//            modifiedObjects.add(takerOrder);
+//            modifiedObjects.add(orderBookState());
+//            return;
+//        }
 
         // order received
         takerOrder.setStatus(OrderStatus.RECEIVED);
