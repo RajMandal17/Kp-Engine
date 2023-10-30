@@ -7,6 +7,7 @@ import com.gitbitex.openapi.model.PagedList;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.springframework.stereotype.Component;
 
@@ -24,9 +25,19 @@ public class OrderRepository {
     }
 
     public Order findByOrderId(String orderId) {
-        return this.collection
-                .find(Filters.eq("_id", orderId))
-                .first();
+        Order ord = null;
+
+        try {
+            ord = this.collection
+                    .find(Filters.eq("_id", orderId))
+                    .first();
+        } catch (Exception e) {
+            // Handle exceptions, log them, or perform error handling as needed
+            e.printStackTrace();
+            // You might want to throw or return an exception here based on your error handling strategy
+        }
+
+        return ord;
     }
 
     public PagedList<Order> findAll(String userId, String productId, OrderStatus status, OrderSide side, int pageIndex,
