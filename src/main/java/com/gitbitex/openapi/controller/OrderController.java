@@ -106,17 +106,17 @@ public class OrderController {
     @DeleteMapping("/orders/{orderId}")
     @SneakyThrows
     public void cancelOrder(@PathVariable String orderId, @RequestAttribute(required = false) User currentUser) {
-        if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.OK);
-        }
+//        if (currentUser == null) {
+//            throw new ResponseStatusException(HttpStatus.OK);
+//        }
 
         Order order = orderRepository.findByOrderId(orderId);
         if (order == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found: " + orderId);
         }
-        if (!order.getUserId().equals(currentUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        }
+//        if (!order.getUserId().equals(currentUser.getId())) {
+//            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+//        }
 
         CancelOrderCommand command = new CancelOrderCommand();
         command.setProductId(order.getProductId());
@@ -124,25 +124,25 @@ public class OrderController {
         matchingEngineCommandProducer.send(command, null);
     }
 
-    @DeleteMapping("/orders")
-    @SneakyThrows
-    public void cancelOrders(String productId, String side, @RequestAttribute(required = false) User currentUser) {
-        if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.OK);
-        }
-
-        OrderSide orderSide = side != null ? OrderSide.valueOf(side.toUpperCase()) : null;
-
-        PagedList<Order> orderPage = orderRepository.findAll(currentUser.getId(), productId, OrderStatus.OPEN,
-                orderSide, 1, 20000);
-
-        for (Order order : orderPage.getItems()) {
-            CancelOrderCommand command = new CancelOrderCommand();
-            command.setProductId(order.getProductId());
-            command.setOrderId(order.getId());
-            matchingEngineCommandProducer.send(command, null);
-        }
-    }
+//    @DeleteMapping("/orders")
+//    @SneakyThrows
+//    public void cancelOrders(String productId, String side, @RequestAttribute(required = false) User currentUser) {
+//        if (currentUser == null) {
+//            throw new ResponseStatusException(HttpStatus.OK);
+//        }
+//
+//        OrderSide orderSide = side != null ? OrderSide.valueOf(side.toUpperCase()) : null;
+//
+//        PagedList<Order> orderPage = orderRepository.findAll(currentUser.getId(), productId, OrderStatus.OPEN,
+//                orderSide, 1, 20000);
+//
+//        for (Order order : orderPage.getItems()) {
+//            CancelOrderCommand command = new CancelOrderCommand();
+//            command.setProductId(order.getProductId());
+//            command.setOrderId(order.getId());
+//            matchingEngineCommandProducer.send(command, null);
+//        }
+//    }
 
     @GetMapping("/orders")
     public PagedList<OrderDto> listOrders(@RequestParam(required = false) String productId,
