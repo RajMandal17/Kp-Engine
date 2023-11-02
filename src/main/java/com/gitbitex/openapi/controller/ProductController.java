@@ -70,11 +70,11 @@ public class ProductController {
         product.setQuoteIncrement(request.getQuoteIncrement());
 
         productRepository.save(product); // Assuming you have a method to save the product in your repository
-        PutProductCommand putProductCommand = new PutProductCommand();
-        putProductCommand.setProductId(product.getId());
-        putProductCommand.setBaseCurrency(product.getBaseCurrency());
-        putProductCommand.setQuoteCurrency(product.getQuoteCurrency());
-        producer.send(putProductCommand, null);
+//        PutProductCommand putProductCommand = new PutProductCommand();
+//        putProductCommand.setProductId(product.getId());
+//        putProductCommand.setBaseCurrency(product.getBaseCurrency());
+//        putProductCommand.setQuoteCurrency(product.getQuoteCurrency());
+//        producer.send(putProductCommand, null);
 
         return product;
     }
