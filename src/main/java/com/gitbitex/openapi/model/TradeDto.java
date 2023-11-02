@@ -9,7 +9,6 @@ public class TradeDto {
     private long sequence;
 
     private String price;
-
     private String takeruserId;
     private String makeruserId;
     private String time;

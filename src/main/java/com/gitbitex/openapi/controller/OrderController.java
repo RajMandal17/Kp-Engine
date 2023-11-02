@@ -20,6 +20,7 @@ import com.gitbitex.openapi.model.PlaceOrderRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -104,46 +105,65 @@ public class OrderController {
     }
 
     @DeleteMapping("/orders/{orderId}")
-    @SneakyThrows
-    public void cancelOrder(@PathVariable String orderId, @RequestAttribute(required = false) User currentUser) {
-        if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.OK);
-        }
-
+    public ResponseEntity<Object> cancelOrder(@PathVariable String orderId) {
         Order order = orderRepository.findByOrderId(orderId);
         if (order == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "order not found: " + orderId);
-        }
-        if (!order.getUserId().equals(currentUser.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
+
         }
 
+        // Process the order cancellation here
         CancelOrderCommand command = new CancelOrderCommand();
         command.setProductId(order.getProductId());
         command.setOrderId(order.getId());
         matchingEngineCommandProducer.send(command, null);
-    }
+        // If cancellation is successful, return a success response
+        return ResponseEntity.ok(new OrderCancellationResponse("success", "cancelling"));
+         }
 
-    @DeleteMapping("/orders")
-    @SneakyThrows
-    public void cancelOrders(String productId, String side, @RequestAttribute(required = false) User currentUser) {
-        if (currentUser == null) {
-            throw new ResponseStatusException(HttpStatus.OK);
+    // Response class for JSON structure
+    private static class OrderCancellationResponse {
+        private final String status;
+        private final String type;
+
+        public OrderCancellationResponse(String status, String type) {
+            this.status = status;
+            this.type = type;
         }
 
-        OrderSide orderSide = side != null ? OrderSide.valueOf(side.toUpperCase()) : null;
+        public String getStatus() {
+            return status;
+        }
 
-        PagedList<Order> orderPage = orderRepository.findAll(currentUser.getId(), productId, OrderStatus.OPEN,
-                orderSide, 1, 20000);
-
-        for (Order order : orderPage.getItems()) {
-            CancelOrderCommand command = new CancelOrderCommand();
-            command.setProductId(order.getProductId());
-            command.setOrderId(order.getId());
-            matchingEngineCommandProducer.send(command, null);
+        public String getType() {
+            return type;
         }
     }
 
+
+
+
+//
+//    @DeleteMapping("/orders")
+//    @SneakyThrows
+//    public void cancelOrders(String productId, String side, @RequestAttribute(required = false) User currentUser) {
+//        if (currentUser == null) {
+//            throw new ResponseStatusException(HttpStatus.OK);
+//        }
+//
+//        OrderSide orderSide = side != null ? OrderSide.valueOf(side.toUpperCase()) : null;
+//
+//        PagedList<Order> orderPage = orderRepository.findAll(currentUser.getId(), productId, OrderStatus.OPEN,
+//                orderSide, 1, 20000);
+//
+//        for (Order order : orderPage.getItems()) {
+//            CancelOrderCommand command = new CancelOrderCommand();
+//            command.setProductId(order.getProductId());
+//            command.setOrderId(order.getId());
+//            matchingEngineCommandProducer.send(command, null);
+//        }
+//    }
+//
     @GetMapping("/orders")
     public PagedList<OrderDto> listOrders(@RequestParam(required = false) String productId,
                                           @RequestParam(required = false) String status,

@@ -21,7 +21,5 @@ public class Product {
     private int baseScale;
     private int quoteScale;
     private float quoteIncrement;
-    private float takerFeeRate;
-    private float makerFeeRate;
-    private int displayOrder;
+
 }

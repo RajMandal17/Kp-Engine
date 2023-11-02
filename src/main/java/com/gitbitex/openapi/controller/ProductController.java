@@ -1,5 +1,9 @@
 package com.gitbitex.openapi.controller;
 
+import com.gitbitex.enums.OrderSide;
+import com.gitbitex.enums.OrderType;
+import com.gitbitex.enums.TimeInForce;
+import com.gitbitex.feed.message.OrderFeedMessage;
 import com.gitbitex.marketdata.entity.Candle;
 import com.gitbitex.marketdata.entity.Product;
 import com.gitbitex.marketdata.entity.Trade;
@@ -7,19 +11,24 @@ import com.gitbitex.marketdata.repository.CandleRepository;
 import com.gitbitex.marketdata.repository.ProductRepository;
 import com.gitbitex.marketdata.repository.TradeRepository;
 import com.gitbitex.matchingengine.OrderBookSnapshotStore;
+import com.gitbitex.matchingengine.command.MatchingEngineCommandProducer;
+import com.gitbitex.matchingengine.command.PlaceOrderCommand;
+import com.gitbitex.matchingengine.command.PutProductCommand;
 import com.gitbitex.matchingengine.message.OrderMatchMessage;
-import com.gitbitex.openapi.model.PagedList;
-import com.gitbitex.openapi.model.ProductDto;
-import com.gitbitex.openapi.model.TradeDto;
+import com.gitbitex.matchingengine.message.OrderMessage;
+import com.gitbitex.openapi.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
+import javax.validation.Valid;
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController()
@@ -29,14 +38,47 @@ public class ProductController {
     private final ProductRepository productRepository;
     private final TradeRepository tradeRepository;
     private final CandleRepository candleRepository;
+    private final MatchingEngineCommandProducer producer;
 
     @GetMapping("/api/products")
     public List<ProductDto> getProducts() {
         List<Product> products = productRepository.findAll();
         return products.stream().map(this::productDto).collect(Collectors.toList());
     }
+    @PostMapping("/api/addproducts")
+    public Product addProduct(@RequestBody ProductDto request) {
+        Product product = new Product();
+        String productId = request.getId();
+        product.setId(productId);
+        // Set createdAt and updatedAt to the current date and time
+        Date currentDate = new Date();
+        product.setCreatedAt(currentDate);
+        product.setUpdatedAt(currentDate);
+        // Set other properties
+        product.setBaseCurrency(request.getBaseCurrency());
+        product.setQuoteCurrency(request.getQuoteCurrency());
+        product.setBaseScale(6);
+        product.setQuoteScale(2);
+        product.setBaseMinSize(BigDecimal.ZERO);
+        product.setBaseMaxSize(new BigDecimal("100000000"));
+        product.setQuoteMinSize(BigDecimal.ZERO);
+        product.setQuoteMaxSize(new BigDecimal("10000000000"));
+        product.setQuoteIncrement(request.getQuoteIncrement());
 
-    @GetMapping("/api/products/{productId}/trades")
+        productRepository.save(product); // Assuming you have a method to save the product in your repository
+        PutProductCommand putProductCommand = new PutProductCommand();
+        putProductCommand.setProductId(product.getId());
+        putProductCommand.setBaseCurrency(product.getBaseCurrency());
+        putProductCommand.setQuoteCurrency(product.getQuoteCurrency());
+        producer.send(putProductCommand, null);
+
+        return product;
+    }
+
+
+
+
+@GetMapping("/api/products/{productId}/trades")
     public List<TradeDto> getProductTrades(@PathVariable String productId) {
         List<Trade> trades = tradeRepository.findByProductId(productId, 50);
 
@@ -87,7 +129,7 @@ public class ProductController {
         ProductDto productDto = new ProductDto();
         BeanUtils.copyProperties(product, productDto);
         productDto.setId(product.getId());
-        productDto.setQuoteIncrement(String.valueOf(product.getQuoteIncrement()));
+        productDto.setQuoteIncrement(Float.parseFloat(String.valueOf(product.getQuoteIncrement())));
         return productDto;
     }
 

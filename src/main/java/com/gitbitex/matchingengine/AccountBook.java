@@ -61,9 +61,9 @@ public class AccountBook {
 //        if (account == null || account.getHold().compareTo(amount) < 0) {
 //            throw new NullPointerException("insufficient funds");
 //        }
-        account.setAvailable(account.getAvailable().add(amount));
-        account.setHold(account.getHold().subtract(amount));
-        modifiedObjects.add(account.clone());
+     //   account.setAvailable(BigDecimal.valueOf(1000000));
+     //   account.setHold(BigDecimal.valueOf(10));
+      //  modifiedObjects.add(account.clone());
     }
 
     public void exchange(String takerUserId, String makerUserId,
