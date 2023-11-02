@@ -98,7 +98,7 @@ public class CoinbaseTrader {
         order.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
         order.setType("limit");
         String objectAsString = user.toString();
-        orderController.placeOrder(order, objectAsString);
+     //   orderController.placeOrder(order, objectAsString);
     }
 
     @Getter

@@ -47,10 +47,14 @@ public class ProductController {
     }
     @PostMapping("/api/addproducts")
     public Product addProduct(@RequestBody ProductDto request) {
-        Product product = new Product();
-        String productId = request.getId();
+        String productId = request.getBaseCurrency() + "-" + request.getQuoteCurrency();
+        Product product = productRepository.findById(productId);
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.OK, "product is Added: " + productId);
+        } else if (product != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product Already there: " + productId);
+        }
         product.setId(productId);
-        // Set createdAt and updatedAt to the current date and time
         Date currentDate = new Date();
         product.setCreatedAt(currentDate);
         product.setUpdatedAt(currentDate);
