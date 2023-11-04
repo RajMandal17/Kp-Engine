@@ -21,4 +21,5 @@ public class Trade {
     private BigDecimal size;
     private OrderSide side;
     private Date time;
+    private String status;
 }

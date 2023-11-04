@@ -27,9 +27,18 @@ public class TradeRepository {
                 .into(new ArrayList<>());
     }
 
+    public List<Trade> findAllTrade(String status, int limit) {
+        Bson filter = Filters.eq("status", status);
+        return this.collection.find(filter)
+                .sort(Sorts.descending("sequence"))
+                .limit(limit)
+                .into(new ArrayList<>());
+    }
+
     public void saveAll(Collection<Trade> trades) {
         List<WriteModel<Trade>> writeModels = new ArrayList<>();
         for (Trade item : trades) {
+            item.setStatus("0");
             Bson filter = Filters.eq("_id", item.getId());
             WriteModel<Trade> writeModel = new ReplaceOneModel<>(filter, item, new ReplaceOptions().upsert(true));
             writeModels.add(writeModel);

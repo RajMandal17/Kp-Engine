@@ -94,7 +94,20 @@ public class ProductController {
 
         return tradeDtos;
     }
+    @GetMapping("/api/trade")
+    public List<TradeDto> getTrades( ) {
+        List<Trade> trades = tradeRepository.findAllTrade( "0",50);
+        List<TradeDto> tradeDtos = new ArrayList<TradeDto>();
+        for (Trade trade : trades) {
+//            if(!trade.getStatus().equals("0")){
+            tradeDtos.add(tradeDto(trade));
 
+
+        }
+//        }
+        return tradeDtos;
+
+    }
 
     @GetMapping("/api/products/{productId}/candles")
     public List<List<Object>> getProductCandles(@PathVariable String productId, @RequestParam int granularity,
@@ -140,12 +153,24 @@ public class ProductController {
     private TradeDto tradeDto(Trade trade) {
         TradeDto tradeDto = new TradeDto();
         var message = new OrderMatchMessage();
+        tradeDto.setProductId(trade.getProductId());
+        tradeDto.setTakerOrderId(trade.getTakerOrderId());
+        tradeDto.setMakerOrderId(trade.getMakerOrderId());
+        tradeDto.setStatus(trade.getStatus());
         tradeDto.setSequence(trade.getSequence());
-        tradeDto.setTime(trade.getTime().toInstant().toString());
-        tradeDto.setPrice(trade.getPrice().toPlainString());
-        tradeDto.setSize(trade.getSize().toPlainString());
-        tradeDto.setSide(trade.getSide().name().toLowerCase());
+        tradeDto.setTime(trade.getTime());
+        tradeDto.setPrice(trade.getPrice());
+        tradeDto.setSize(trade.getSize());
+        tradeDto.setSide(trade.getSide());
+        if (trade.getStatus() == null ){
+        tradeDto.setStatus("0");
+        }
+        else {
+            tradeDto.setStatus(trade.getStatus());
+        }
+
       //  tradeDto.setTakeruserId();
         return tradeDto;
     }
+
 }
