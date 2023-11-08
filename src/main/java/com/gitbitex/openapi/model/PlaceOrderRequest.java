@@ -30,5 +30,5 @@ public class PlaceOrderRequest {
     /**
      * [optional] GTC, GTT, IOC, or FOK (default is GTC)
      */
-    private String timeInForce;
+    private String TimeInForce;
 }

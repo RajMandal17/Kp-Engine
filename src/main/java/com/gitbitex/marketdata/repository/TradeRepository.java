@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -24,6 +25,12 @@ public class TradeRepository {
         return this.collection.find(Filters.eq("productId", productId))
                 .sort(Sorts.descending("sequence"))
                 .limit(limit)
+                .into(new ArrayList<>());
+    }
+
+    public List<Trade> findByProductId(String id) {
+        return this.collection.find(Filters.eq("_id", id))
+                .sort(Sorts.descending("sequence"))
                 .into(new ArrayList<>());
     }
 
@@ -44,6 +51,14 @@ public class TradeRepository {
             writeModels.add(writeModel);
         }
         collection.bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
+    }
+
+
+    public void save(Trade trade) {
+
+        Bson filter = Filters.eq("_id", trade.getId());
+        ReplaceOneModel<Trade> writeModel = new ReplaceOneModel<>(filter, trade, new ReplaceOptions().upsert(true));
+        collection.replaceOne(filter, trade, new ReplaceOptions().upsert(true));
     }
 
 }

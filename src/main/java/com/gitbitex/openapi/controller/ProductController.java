@@ -5,9 +5,11 @@ import com.gitbitex.enums.OrderType;
 import com.gitbitex.enums.TimeInForce;
 import com.gitbitex.feed.message.OrderFeedMessage;
 import com.gitbitex.marketdata.entity.Candle;
+import com.gitbitex.marketdata.entity.Order;
 import com.gitbitex.marketdata.entity.Product;
 import com.gitbitex.marketdata.entity.Trade;
 import com.gitbitex.marketdata.repository.CandleRepository;
+import com.gitbitex.marketdata.repository.OrderRepository;
 import com.gitbitex.marketdata.repository.ProductRepository;
 import com.gitbitex.marketdata.repository.TradeRepository;
 import com.gitbitex.matchingengine.OrderBookSnapshotStore;
@@ -37,6 +39,7 @@ public class ProductController {
     private final OrderBookSnapshotStore orderBookSnapshotStore;
     private final ProductRepository productRepository;
     private final TradeRepository tradeRepository;
+    private final OrderRepository orderRepository;
     private final CandleRepository candleRepository;
     private final MatchingEngineCommandProducer producer;
 
@@ -58,7 +61,6 @@ public class ProductController {
         Date currentDate = new Date();
         product.setCreatedAt(currentDate);
         product.setUpdatedAt(currentDate);
-        // Set other properties
         product.setBaseCurrency(request.getBaseCurrency());
         product.setQuoteCurrency(request.getQuoteCurrency());
         product.setBaseScale(6);
@@ -68,14 +70,7 @@ public class ProductController {
         product.setQuoteMinSize(BigDecimal.ZERO);
         product.setQuoteMaxSize(new BigDecimal("10000000000"));
         product.setQuoteIncrement(request.getQuoteIncrement());
-
         productRepository.save(product); // Assuming you have a method to save the product in your repository
-//        PutProductCommand putProductCommand = new PutProductCommand();
-//        putProductCommand.setProductId(product.getId());
-//        putProductCommand.setBaseCurrency(product.getBaseCurrency());
-//        putProductCommand.setQuoteCurrency(product.getQuoteCurrency());
-//        producer.send(putProductCommand, null);
-
         return product;
     }
 
@@ -85,23 +80,34 @@ public class ProductController {
 @GetMapping("/api/products/{productId}/trades")
     public List<TradeDto> getProductTrades(@PathVariable String productId) {
         List<Trade> trades = tradeRepository.findByProductId(productId, 50);
-
         List<TradeDto> tradeDtos = new ArrayList<TradeDto>();
         for (Trade trade : trades) {
-
             tradeDtos.add(tradeDto(trade));
         }
-
         return tradeDtos;
     }
-    @GetMapping("/api/trade")
+
+    @PostMapping("/api/trade/{id}")
+    public void searchTradeByProductId(@RequestBody @Valid TradeStatus request,@PathVariable String id) {
+        List<Trade> trades = tradeRepository.findByProductId(id);
+        if (!trades.isEmpty()) {
+                for (Trade trade : trades) {
+                  trade.setStatus(request.getStatus());
+                    tradeRepository.save(trade);
+                }
+                throw new ResponseStatusException(HttpStatus.OK, "Updated: " + id);
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Id Not Found: " + id);
+            }
+        }
+
+        @GetMapping("/api/trade")
     public List<TradeDto> getTrades( ) {
         List<Trade> trades = tradeRepository.findAllTrade( "0",50);
         List<TradeDto> tradeDtos = new ArrayList<TradeDto>();
         for (Trade trade : trades) {
 //            if(!trade.getStatus().equals("0")){
             tradeDtos.add(tradeDto(trade));
-
 
         }
 //        }
@@ -152,7 +158,6 @@ public class ProductController {
 
     private TradeDto tradeDto(Trade trade) {
         TradeDto tradeDto = new TradeDto();
-        var message = new OrderMatchMessage();
         tradeDto.setProductId(trade.getProductId());
         tradeDto.setTakerOrderId(trade.getTakerOrderId());
         tradeDto.setMakerOrderId(trade.getMakerOrderId());
@@ -162,14 +167,26 @@ public class ProductController {
         tradeDto.setPrice(trade.getPrice());
         tradeDto.setSize(trade.getSize());
         tradeDto.setSide(trade.getSide());
+        Order order = orderRepository.findByOrderId(trade.getTakerOrderId());
+        tradeDto.setTradeId(order.getId());
+        tradeDto.setTakeruserId(trade.getTakerOrderId());
+        tradeDto.setMakeruserId(trade.getMakerOrderId());
+        tradeDto.setMakerfunds(String.valueOf(trade.getPrice()));
+        tradeDto.setMakerfillFees(String.valueOf(order.getFillFees()));
+        tradeDto.setMakerfilledSize(String.valueOf(order.getFilledSize()));
+        tradeDto.setMakerexecutedValue(String.valueOf(order.getExecutedValue()));
+        tradeDto.setMakerstatus(String.valueOf(order.getStatus()));
+        tradeDto.setTakerfunds(String.valueOf(order.getFunds()));
+        tradeDto.setTakerfillFees(String.valueOf(trade.getPrice()));
+        tradeDto.setTakerfilledSize(String.valueOf(order.getFilledSize()));
+        tradeDto.setTakerexecutedValue(String.valueOf(order.getExecutedValue()));
+        tradeDto.setTakerstatus(String.valueOf(order.getStatus()));
         if (trade.getStatus() == null ){
-        tradeDto.setStatus("0");
+        tradeDto.setStatus(String.valueOf(order.getStatus()));
         }
         else {
             tradeDto.setStatus(trade.getStatus());
         }
-
-      //  tradeDto.setTakeruserId();
         return tradeDto;
     }
 
