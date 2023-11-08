@@ -22,15 +22,13 @@ import com.gitbitex.openapi.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.validation.Valid;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController()
@@ -88,20 +86,31 @@ public class ProductController {
     }
 
     @PostMapping("/api/trade/{id}")
-    public void searchTradeByProductId(@RequestBody @Valid TradeStatus request,@PathVariable String id) {
+    public ResponseEntity<Map<String, String>> searchTradeByProductId(@RequestBody @Valid TradeStatus request, @PathVariable String id) {
         List<Trade> trades = tradeRepository.findByProductId(id);
+
         if (!trades.isEmpty()) {
-                for (Trade trade : trades) {
-                  trade.setStatus(request.getStatus());
-                    tradeRepository.save(trade);
-                }
-                throw new ResponseStatusException(HttpStatus.OK, "Updated: " + id);
-            } else {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Id Not Found: " + id);
+            for (Trade trade : trades) {
+                trade.setStatus(request.getStatus());
+                tradeRepository.save(trade);
             }
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "200");
+            response.put("id", id);
+            response.put("message", "updated successfully");
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } else {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("status", "400");
+            errorResponse.put("id", id);
+            errorResponse.put("message", "Not updated");
+            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
         }
 
-        @GetMapping("/api/trade")
+    }
+
+
+    @GetMapping("/api/trade")
     public List<TradeDto> getTrades( ) {
         List<Trade> trades = tradeRepository.findAllTrade( "0",50);
         List<TradeDto> tradeDtos = new ArrayList<TradeDto>();
@@ -172,7 +181,7 @@ public class ProductController {
         tradeDto.setTakeruserId(trade.getTakerOrderId());
         tradeDto.setMakeruserId(trade.getMakerOrderId());
         tradeDto.setMakerfunds(String.valueOf(trade.getPrice()));
-        tradeDto.setMakerfillFees(String.valueOf(order.getFillFees()));
+        tradeDto.setMakerfillFees( order.getFillFees() != null ? order.getFillFees().stripTrailingZeros().toPlainString() : "0");
         tradeDto.setMakerfilledSize(String.valueOf(order.getFilledSize()));
         tradeDto.setMakerexecutedValue(String.valueOf(order.getExecutedValue()));
         tradeDto.setMakerstatus(String.valueOf(order.getStatus()));
