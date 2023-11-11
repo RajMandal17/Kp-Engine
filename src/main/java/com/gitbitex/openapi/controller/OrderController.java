@@ -109,18 +109,23 @@ public class OrderController {
         Order order = orderRepository.findByOrderId(orderId);
         if (order == null) {
             return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
-
         }
+        if ("CANCELLED".equals(order.getStatus())) {
 
-        // Process the order cancellation here
-        CancelOrderCommand command = new CancelOrderCommand();
-        command.setProductId(order.getProductId());
-        command.setOrderId(order.getId());
-        matchingEngineCommandProducer.send(command, null);
+            return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
+        }else {
+
+            order.setStatus(OrderStatus.CANCELLED);
+            orderRepository.updateOrderStatus(order.getId(), order.getStatus());
+            // Process the order cancellation here
+            CancelOrderCommand command = new CancelOrderCommand();
+            command.setProductId(order.getProductId());
+            command.setOrderId(order.getId());
+            matchingEngineCommandProducer.send(command, null);
+        }
         // If cancellation is successful, return a success response
         return ResponseEntity.ok(new OrderCancellationResponse("success", "cancelling"));
          }
-
     // Response class for JSON structure
     private static class OrderCancellationResponse {
         private final String status;
@@ -182,10 +187,27 @@ public class OrderController {
                 orderPage.getItems().stream().map(this::orderDto).collect(Collectors.toList()),
                 orderPage.getCount());
     }
+    @GetMapping("/CancelOrders")
+    public PagedList<OrderDto> listCancelOrders(@RequestParam(defaultValue = "1") int page,
+                                          @RequestParam(defaultValue = "50") int pageSize) {
+
+         String status="CANCELLED";
+        OrderStatus orderStatus = status != null ? OrderStatus.valueOf(status.toUpperCase()) : null;
+
+        PagedList<Order> orderPage = orderRepository.findAll( orderStatus, page, pageSize);
+        return new PagedList<>(
+                orderPage.getItems().stream().map(this::orderDto).collect(Collectors.toList()),
+                orderPage.getCount());
+    }
 
     private OrderDto orderDto(Order order) {
         OrderDto orderDto = new OrderDto();
         orderDto.setId(order.getId());
+       orderDto.setUserId(order.getUserId());
+       orderDto.setFillFees(String.valueOf(order.getFillFees()));
+       orderDto.setUpdatedAt(String.valueOf(order.getUpdatedAt()));
+       orderDto.setClientOid(order.getClientOid());
+       orderDto.setTimeInForce(order.getTimeInForce());
         orderDto.setPrice(order.getPrice().toPlainString());
         orderDto.setSize(order.getSize().toPlainString());
         orderDto.setFilledSize(order.getFilledSize() != null ? order.getFilledSize().toPlainString() : "0");

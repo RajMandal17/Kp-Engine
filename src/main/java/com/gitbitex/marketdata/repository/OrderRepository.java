@@ -7,6 +7,7 @@ import com.gitbitex.openapi.model.PagedList;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,12 @@ public class OrderRepository {
         return this.collection
                 .find(Filters.eq("_id", orderId))
                 .first();
+    }
+
+    public UpdateResult updateOrderStatus(String orderId, OrderStatus newStatus) {
+        Bson filter = Filters.eq("_id", orderId);
+        Bson update = Updates.set("status", newStatus.name());
+        return this.collection.updateOne(filter, update);
     }
 
     public PagedList<Order> findAll(String userId, String productId, OrderStatus status, OrderSide side, int pageIndex,
@@ -63,5 +70,19 @@ public class OrderRepository {
             writeModels.add(writeModel);
         }
         collection.bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
+    }
+    public PagedList<Order> findAll(  OrderStatus status , int pageIndex, int pageSize) {
+        Bson filter = Filters.empty();
+        if (status != null) {
+            filter = Filters.and(Filters.eq("status", status.name()), filter);
+        }
+        long count = this.collection.countDocuments(filter);
+        List<Order> orders = this.collection
+                .find(filter)
+                .sort(Sorts.descending("sequence"))
+                .skip(pageIndex - 1)
+                .limit(pageSize)
+                .into(new ArrayList<>());
+        return new PagedList<>(orders, count);
     }
 }
