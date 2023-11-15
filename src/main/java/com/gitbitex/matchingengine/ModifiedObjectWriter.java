@@ -19,6 +19,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.RestTemplate;
 
 @Component
 @Slf4j
@@ -115,7 +119,15 @@ public class ModifiedObjectWriter implements EngineListener {
                 savedCounter.incrementAndGet();
                 modifiedObjectSavedCounter.increment();
             });
+
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Trade> requestEntity = new HttpEntity<>(trade, headers);
+            String apiUrl = "http://localhost:3000/api/tradehistory";
+            restTemplate.postForObject(apiUrl, requestEntity, String.class);
         });
+
     }
 
     private void save(AtomicLong savedCounter, OrderBookMessage orderBookMessage) {
