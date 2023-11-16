@@ -19,6 +19,7 @@ import com.gitbitex.openapi.model.PagedList;
 import com.gitbitex.openapi.model.PlaceOrderRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ import javax.validation.Valid;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -38,6 +40,8 @@ public class OrderController {
     private final OrderRepository orderRepository;
     private final MatchingEngineCommandProducer matchingEngineCommandProducer;
     private final ProductRepository productRepository;
+
+
 
     @PostMapping(value = "/orders/{id}")
     public OrderDto placeOrder(@RequestBody @Valid PlaceOrderRequest request,@PathVariable String id) {
@@ -110,7 +114,7 @@ public class OrderController {
         if (order == null) {
             return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
         }
-        if ("CANCELLED".equals(order.getStatus())) {
+        if (order.getStatus().equals(OrderStatus.CANCELLED)) {
 
             return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
         }else {
@@ -142,6 +146,22 @@ public class OrderController {
 
         public String getType() {
             return type;
+        }
+    }
+
+
+
+
+
+
+    @GetMapping("/api/orderbooksnap")
+    public ResponseEntity<String> getOrderBookSnapshot(@RequestParam String productId) {
+        String orderBookSnapshot = orderRepository.getOrderBookSnapshot(productId);
+
+        if (orderBookSnapshot != null) {
+            return ResponseEntity.ok(orderBookSnapshot);
+        } else {
+            return ResponseEntity.notFound().build();
         }
     }
 

@@ -10,7 +10,9 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 import org.bson.conversions.Bson;
 import org.springframework.stereotype.Component;
-
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -18,6 +20,9 @@ import java.util.List;
 @Component
 public class OrderRepository {
     private final MongoCollection<Order> collection;
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
 
     public OrderRepository(MongoDatabase database) {
         this.collection = database.getCollection(Order.class.getSimpleName().toLowerCase(), Order.class);
@@ -84,5 +89,10 @@ public class OrderRepository {
                 .limit(pageSize)
                 .into(new ArrayList<>());
         return new PagedList<>(orders, count);
+    }
+
+    public String getOrderBookSnapshot(String productId) {
+        String redisKey = productId + ".l2_batch_order_book";
+        return redisTemplate.opsForValue().get(redisKey);
     }
 }
