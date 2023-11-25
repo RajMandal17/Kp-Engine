@@ -21,6 +21,14 @@ public class TradeRepository {
         this.collection.createIndex(Indexes.descending("productId", "sequence"));
     }
 
+//
+
+public Trade findByTradeId(String tradeId) {
+        return this.collection
+                .find(Filters.eq("_id", tradeId))
+                .first();
+    }
+//
     public List<Trade> findByProductId(String productId, int limit) {
         return this.collection.find(Filters.eq("productId", productId))
                 .sort(Sorts.descending("sequence"))
@@ -36,6 +44,17 @@ public class TradeRepository {
 
     public List<Trade> findAllTrade(String status, int limit) {
         Bson filter = Filters.eq("status", status);
+        return this.collection.find(filter)
+                .sort(Sorts.descending("sequence"))
+                .limit(limit)
+                .into(new ArrayList<>());
+    }
+    public List<Trade> findTradeByOrderId(String orderId, int limit) {
+        Bson filter = Filters.or(
+                Filters.eq("takerOrderId", orderId),
+                Filters.eq("makerOrderId", orderId)
+        );
+
         return this.collection.find(filter)
                 .sort(Sorts.descending("sequence"))
                 .limit(limit)

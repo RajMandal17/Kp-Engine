@@ -72,9 +72,17 @@ public class ProductController {
         return product;
     }
 
+//
+@GetMapping("/api/tradestatus/{tradeId}")
+    public ResponseEntity<Object> tradeList(@PathVariable String tradeId) {
+        Trade trade = tradeRepository.findByTradeId(tradeId);
 
-
-
+    if (trade == null) {
+        return ResponseEntity.badRequest().body(new ProductController.tradeStatusResponse("failed", "nil"));
+    }
+    return ResponseEntity.ok(trade);
+}
+//
 @GetMapping("/api/products/{productId}/trades")
     public List<TradeDto> getProductTrades(@PathVariable String productId) {
         List<Trade> trades = tradeRepository.findByProductId(productId, 50);
@@ -123,6 +131,24 @@ public class ProductController {
         return tradeDtos;
 
     }
+
+    @GetMapping("/api/trade/{orderId}")
+    public ResponseEntity<?> getTradesByOrder(@PathVariable String orderId) {
+        List<Trade> trades = tradeRepository.findTradeByOrderId(orderId, 50);
+
+        if (trades.isEmpty()) {
+            // If no trades found, construct a JSON response with status "false" and message "no-order found"
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", false);
+            response.put("message", "no-order found");
+            return ResponseEntity.status(404).body(response);
+        } else {
+            // If trades found, convert them to DTOs and return
+            List<TradeDto> tradeDtos = trades.stream().map(this::tradeDto).collect(Collectors.toList());
+            return ResponseEntity.ok(tradeDtos);
+        }
+    }
+
 
     @GetMapping("/api/products/{productId}/candles")
     public List<List<Object>> getProductCandles(@PathVariable String productId, @RequestParam int granularity,
@@ -176,22 +202,23 @@ public class ProductController {
         tradeDto.setPrice(trade.getPrice());
         tradeDto.setSize(trade.getSize());
         tradeDto.setSide(trade.getSide());
+        tradeDto.setTradeId(trade.getId());
+        Order makerorder = orderRepository.findByOrderId(trade.getMakerOrderId());
+        tradeDto.setMakeruserId(makerorder.getUserId());
+        tradeDto.setMakerfunds(String.valueOf(makerorder.getFunds()));
+        tradeDto.setMakerfillFees(makerorder.getFillFees() != null ? makerorder.getFillFees().stripTrailingZeros().toPlainString() : "0");
+        tradeDto.setMakerfilledSize(String.valueOf(makerorder.getFilledSize()));
+        tradeDto.setMakerexecutedValue(String.valueOf(makerorder.getExecutedValue()));
+        tradeDto.setMakerstatus(String.valueOf(makerorder.getStatus()));
         Order order = orderRepository.findByOrderId(trade.getTakerOrderId());
-        tradeDto.setTradeId(order.getId());
-        tradeDto.setTakeruserId(trade.getTakerOrderId());
-        tradeDto.setMakeruserId(trade.getMakerOrderId());
-        tradeDto.setMakerfunds(String.valueOf(trade.getPrice()));
-        tradeDto.setMakerfillFees( order.getFillFees() != null ? order.getFillFees().stripTrailingZeros().toPlainString() : "0");
-        tradeDto.setMakerfilledSize(String.valueOf(order.getFilledSize()));
-        tradeDto.setMakerexecutedValue(String.valueOf(order.getExecutedValue()));
-        tradeDto.setMakerstatus(String.valueOf(order.getStatus()));
+        tradeDto.setTakeruserId(order.getUserId());
         tradeDto.setTakerfunds(String.valueOf(order.getFunds()));
-        tradeDto.setTakerfillFees(String.valueOf(trade.getPrice()));
+        tradeDto.setTakerfillFees(order.getFillFees() != null ? order.getFillFees().stripTrailingZeros().toPlainString() : "0");
         tradeDto.setTakerfilledSize(String.valueOf(order.getFilledSize()));
-        tradeDto.setTakerexecutedValue(String.valueOf(order.getExecutedValue()));
+        tradeDto.setTakerexecutedValue(String.valueOf(makerorder.getExecutedValue()));
         tradeDto.setTakerstatus(String.valueOf(order.getStatus()));
         if (trade.getStatus() == null ){
-        tradeDto.setStatus(String.valueOf(order.getStatus()));
+            tradeDto.setStatus(String.valueOf(order.getStatus()));
         }
         else {
             tradeDto.setStatus(trade.getStatus());
@@ -199,4 +226,53 @@ public class ProductController {
         return tradeDto;
     }
 
+
+//
+//    private TradeDto tradeDto(Trade trade) {
+//        TradeDto tradeDto = new TradeDto();
+//        tradeDto.setProductId(trade.getProductId());
+//        tradeDto.setTakerOrderId(trade.getTakerOrderId());
+//        tradeDto.setMakerOrderId(trade.getMakerOrderId());
+//        tradeDto.setStatus(trade.getStatus());
+//        tradeDto.setSequence(trade.getSequence());
+//        tradeDto.setTime(trade.getTime());
+//        tradeDto.setPrice(trade.getPrice());
+//        tradeDto.setSize(trade.getSize());
+//        tradeDto.setSide(trade.getSide());
+//        Order order = orderRepository.findByOrderId(trade.getTakerOrderId());
+//        tradeDto.setTradeId(order.getId());
+//        tradeDto.setTakeruserId(trade.getTakerOrderId());
+//        tradeDto.setMakeruserId(trade.getMakerOrderId());
+//        tradeDto.setMakerfunds(String.valueOf(trade.getPrice()));
+//        tradeDto.setMakerfillFees( order.getFillFees() != null ? order.getFillFees().stripTrailingZeros().toPlainString() : "0");
+//        tradeDto.setMakerfilledSize(String.valueOf(order.getFilledSize()));
+//        tradeDto.setMakerexecutedValue(String.valueOf(order.getExecutedValue()));
+//        tradeDto.setMakerstatus(String.valueOf(order.getStatus()));
+//        tradeDto.setTakerfunds(String.valueOf(order.getFunds()));
+//        tradeDto.setTakerfillFees(String.valueOf(trade.getPrice()));
+//        tradeDto.setTakerfilledSize(String.valueOf(order.getFilledSize()));
+//        tradeDto.setTakerexecutedValue(String.valueOf(order.getExecutedValue()));
+//        tradeDto.setTakerstatus(String.valueOf(order.getStatus()));
+//        if (trade.getStatus() == null ){
+//        tradeDto.setStatus(String.valueOf(order.getStatus()));
+//        }
+//        else {
+//            tradeDto.setStatus(trade.getStatus());
+//        }
+//        return tradeDto;
+//    }
+
+    public class tradeStatusResponse {
+        private final String status;
+        private final String type;
+        public tradeStatusResponse(String status, String type) {
+            this.status = status;
+            this.type = type;
+        }
+    }
+
+
+
 }
+
+

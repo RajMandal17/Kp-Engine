@@ -19,6 +19,7 @@ import com.gitbitex.openapi.model.PagedList;
 import com.gitbitex.openapi.model.PlaceOrderRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,7 @@ import javax.validation.Valid;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -38,6 +40,8 @@ public class OrderController {
     private final OrderRepository orderRepository;
     private final MatchingEngineCommandProducer matchingEngineCommandProducer;
     private final ProductRepository productRepository;
+
+
 
     @PostMapping(value = "/orders/{id}")
     public OrderDto placeOrder(@RequestBody @Valid PlaceOrderRequest request,@PathVariable String id) {
@@ -51,7 +55,7 @@ public class OrderController {
         OrderType type = OrderType.valueOf(request.getType().toUpperCase());
         OrderSide side = OrderSide.valueOf(request.getSide().toUpperCase());
         BigDecimal size = new BigDecimal(request.getSize());
-        BigDecimal price = request.getPrice() != null ? new BigDecimal(request.getPrice()) : null;
+        BigDecimal price = request.getPrice() != null ? new BigDecimal(String.valueOf(request.getPrice())) : null;
         BigDecimal funds = request.getFunds() != null ? new BigDecimal(request.getFunds()) : null;
         TimeInForce timeInForce = request.getTimeInForce() != null
                 ? TimeInForce.valueOf(request.getTimeInForce().toUpperCase())
@@ -94,7 +98,7 @@ public class OrderController {
             // Set a default value when either funds or remainingFunds is null
             orderDto.setExecutedValue("0");
         }
-        orderDto.setPrice(String.valueOf(command.getPrice()));
+        orderDto.setPrice(String.valueOf(command.getPrice() != null ? command.getPrice(): BigDecimal.ZERO));
         orderDto.setFillFees(ordermsg.getFillFees() != null ? ordermsg.getFillFees().stripTrailingZeros().toPlainString() : "0");
         orderDto.setType(String.valueOf(command.getOrderType()));
         orderDto.setSide(String.valueOf(command.getOrderSide()));
@@ -104,13 +108,26 @@ public class OrderController {
         return orderDto;
     }
 
+
+//    
+    @GetMapping("/orderstatus/{orderId}")
+    public ResponseEntity<Object> orderList(@PathVariable String orderId) {
+        Order order = orderRepository.findByOrderId(orderId);
+        if (order == null) {
+            return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "nil"));
+        }
+            return ResponseEntity.ok(order);
+        }
+    //
+
+
     @DeleteMapping("/orders/{orderId}")
     public ResponseEntity<Object> cancelOrder(@PathVariable String orderId) {
         Order order = orderRepository.findByOrderId(orderId);
         if (order == null) {
             return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
         }
-        if ("CANCELLED".equals(order.getStatus())) {
+        if (order.getStatus().equals(OrderStatus.CANCELLED)) {
 
             return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
         }else {
@@ -145,6 +162,24 @@ public class OrderController {
         }
     }
 
+
+
+
+
+
+
+    @GetMapping("/orderbooksnap")
+    public ResponseEntity<String> getOrderBookSnapshot(@RequestParam String productId) {
+        String orderBookSnapshot = orderRepository.getOrderBookSnapshot(productId);
+
+        if (orderBookSnapshot != null) {
+            return ResponseEntity.ok(orderBookSnapshot);
+        } else {
+            // Construct a JSON response with status "false" and message "no-product found"
+            String jsonResponse = "{\"status\": false, \"message\": \"no-product found\"}";
+            return ResponseEntity.status(404).body(jsonResponse);
+        }
+    }
 
 
 
@@ -187,7 +222,7 @@ public class OrderController {
                 orderPage.getItems().stream().map(this::orderDto).collect(Collectors.toList()),
                 orderPage.getCount());
     }
-    @GetMapping("/CancelOrders")
+    @GetMapping("/cancelorderslist")
     public PagedList<OrderDto> listCancelOrders(@RequestParam(defaultValue = "1") int page,
                                           @RequestParam(defaultValue = "50") int pageSize) {
 
@@ -204,15 +239,16 @@ public class OrderController {
         OrderDto orderDto = new OrderDto();
         orderDto.setId(order.getId());
        orderDto.setUserId(order.getUserId());
-       orderDto.setFillFees(String.valueOf(order.getFillFees()));
+       orderDto.setFillFees(String.valueOf(order.getFilledSize() != null ? order.getFilledSize(): BigDecimal.ZERO));
        orderDto.setUpdatedAt(String.valueOf(order.getUpdatedAt()));
        orderDto.setClientOid(order.getClientOid());
        orderDto.setTimeInForce(order.getTimeInForce());
-        orderDto.setPrice(order.getPrice().toPlainString());
+        orderDto.setPrice(String.valueOf(order.getPrice() != null ? order.getPrice(): BigDecimal.ZERO));
         orderDto.setSize(order.getSize().toPlainString());
-        orderDto.setFilledSize(order.getFilledSize() != null ? order.getFilledSize().toPlainString() : "0");
-        orderDto.setFunds(order.getFunds() != null ? order.getFunds().toPlainString() : "0");
-        orderDto.setExecutedValue(order.getExecutedValue() != null ? order.getExecutedValue().toPlainString() : "0");
+        orderDto.setFilledSize(String.valueOf(order.getFilledSize() != null ? order.getFilledSize(): BigDecimal.ZERO));
+        orderDto.setFunds(String.valueOf(order.getFunds() != null ? order.getFunds() : BigDecimal.ZERO));
+
+        orderDto.setExecutedValue(String.valueOf(order.getExecutedValue() != null ? order.getExecutedValue(): BigDecimal.ZERO));
         orderDto.setSide(order.getSide().name().toLowerCase());
         orderDto.setProductId(order.getProductId());
         orderDto.setType(order.getType().name().toLowerCase());
@@ -227,14 +263,14 @@ public class OrderController {
 
     private void formatPlaceOrderCommand(PlaceOrderCommand command, Product product) {
         BigDecimal size = command.getSize();
-        BigDecimal price = command.getPrice();
-        BigDecimal funds = command.getFunds();
-        OrderSide side = command.getOrderSide();
+        BigDecimal price = new BigDecimal(String.valueOf(command.getPrice()));
+        BigDecimal funds = new BigDecimal(String.valueOf(command.getFunds()));
+        OrderSide side =  command.getOrderSide();
 
         switch (command.getOrderType()) {
             case LIMIT -> {
-                size = size.setScale(product.getBaseScale(), RoundingMode.DOWN);
-                price = price.setScale(product.getQuoteScale(), RoundingMode.DOWN);
+              //  size = size.setScale(product.getBaseScale() );
+              //  price = price.setScale(product.getQuoteScale());
                 funds = side == OrderSide.BUY ? size.multiply(price) : BigDecimal.ZERO;
             }
             case MARKET -> {
