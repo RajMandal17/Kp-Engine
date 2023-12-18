@@ -2,9 +2,9 @@ package com.gitbitex.marketdata;
 
 import com.gitbitex.AppProperties;
 import com.gitbitex.marketdata.entity.Candle;
+import com.gitbitex.marketdata.entity.Trade;
 import com.gitbitex.marketdata.repository.CandleRepository;
 import com.gitbitex.marketdata.util.DateUtil;
-import com.gitbitex.matchingengine.Trade;
 import com.gitbitex.matchingengine.message.TradeMessage;
 import com.gitbitex.middleware.kafka.KafkaConsumerThread;
 import lombok.SneakyThrows;

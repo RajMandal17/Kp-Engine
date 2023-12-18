@@ -9,7 +9,7 @@ import java.util.Date;
 
 @Getter
 @Setter
-public class Trade {
+public class TradeEmit {
     private String productId;
     private long sequence;
     private BigDecimal size;
@@ -19,4 +19,6 @@ public class Trade {
     private OrderSide side;
     private String takerOrderId;
     private String makerOrderId;
+    private String status;
 }
+

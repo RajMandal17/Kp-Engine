@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import javax.validation.constraints.NotBlank;
+import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -19,7 +20,7 @@ public class PlaceOrderRequest {
 
     private String funds;
 
-    private String price;
+    private BigDecimal price;
 
     private String last_trade_id;
     @NotBlank

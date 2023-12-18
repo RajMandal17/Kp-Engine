@@ -8,11 +8,9 @@ import com.gitbitex.marketdata.entity.Candle;
 import com.gitbitex.marketdata.entity.Order;
 import com.gitbitex.marketdata.entity.Product;
 import com.gitbitex.marketdata.entity.Trade;
-import com.gitbitex.marketdata.repository.CandleRepository;
-import com.gitbitex.marketdata.repository.OrderRepository;
-import com.gitbitex.marketdata.repository.ProductRepository;
-import com.gitbitex.marketdata.repository.TradeRepository;
+import com.gitbitex.marketdata.repository.*;
 import com.gitbitex.matchingengine.OrderBookSnapshotStore;
+import com.gitbitex.matchingengine.TradeEmit;
 import com.gitbitex.matchingengine.command.MatchingEngineCommandProducer;
 import com.gitbitex.matchingengine.command.PlaceOrderCommand;
 import com.gitbitex.matchingengine.command.PutProductCommand;
@@ -37,6 +35,7 @@ public class ProductController {
     private final OrderBookSnapshotStore orderBookSnapshotStore;
     private final ProductRepository productRepository;
     private final TradeRepository tradeRepository;
+    private final TradeEmitRepository tradeEmitRepository;
     private final OrderRepository orderRepository;
     private final CandleRepository candleRepository;
     private final MatchingEngineCommandProducer producer;
@@ -72,9 +71,17 @@ public class ProductController {
         return product;
     }
 
+//
+@GetMapping("/api/tradestatus/{tradeId}")
+    public ResponseEntity<Object> tradeList(@PathVariable String tradeId) {
+        Trade trade = tradeRepository.findByTradeId(tradeId);
 
-
-
+    if (trade == null) {
+        return ResponseEntity.badRequest().body(new ProductController.tradeStatusResponse("failed", "nil"));
+    }
+    return ResponseEntity.ok(trade);
+}
+//
 @GetMapping("/api/products/{productId}/trades")
     public List<TradeDto> getProductTrades(@PathVariable String productId) {
         List<Trade> trades = tradeRepository.findByProductId(productId, 50);
@@ -123,6 +130,62 @@ public class ProductController {
         return tradeDtos;
 
     }
+
+    @GetMapping("/api/tradeEmit")
+    public List<TradeEmitDto> getTradeEmit() {
+        List<TradeEmit> trades = tradeEmitRepository.findAllTrade("0", 50);
+        List<TradeEmitDto> tradeEmitDtos = new ArrayList<>();
+        for (TradeEmit trade : trades) {
+            // Uncomment the condition if you want to filter trades based on status
+            // if (!StringUtils.isBlank(trade.getStatus())) {
+            tradeEmitDtos.add(tradeEmits(trade));
+            // }
+        }
+        return tradeEmitDtos;
+    }
+
+    @PostMapping("/api/tradeEmit/{id}")
+    public ResponseEntity<Map<String, String>> searchTradeEmitByProductId(@RequestBody @Valid TradeEmit request, @PathVariable String id) {
+        List<TradeEmit> trades = tradeEmitRepository.findByProductId(id);
+
+        if (!trades.isEmpty()) {
+            for (TradeEmit tradeEmit : trades) {
+                tradeEmit.setStatus(request.getStatus());
+                tradeEmitRepository.save(tradeEmit);
+            }
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "200");
+            response.put("id", id);
+            response.put("message", "updated successfully");
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } else {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("status", "400");
+            errorResponse.put("id", id);
+            errorResponse.put("message", "Not updated");
+            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        }
+
+    }
+
+
+    @GetMapping("/api/trade/{orderId}")
+    public ResponseEntity<?> getTradesByOrder(@PathVariable String orderId) {
+        List<Trade> trades = tradeRepository.findTradeByOrderId(orderId, 50);
+
+        if (trades.isEmpty()) {
+            // If no trades found, construct a JSON response with status "false" and message "no-order found"
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", false);
+            response.put("message", "no-order found");
+            return ResponseEntity.status(404).body(response);
+        } else {
+            // If trades found, convert them to DTOs and return
+            List<TradeDto> tradeDtos = trades.stream().map(this::tradeDto).collect(Collectors.toList());
+            return ResponseEntity.ok(tradeDtos);
+        }
+    }
+
 
     @GetMapping("/api/products/{productId}/candles")
     public List<List<Object>> getProductCandles(@PathVariable String productId, @RequestParam int granularity,
@@ -176,22 +239,23 @@ public class ProductController {
         tradeDto.setPrice(trade.getPrice());
         tradeDto.setSize(trade.getSize());
         tradeDto.setSide(trade.getSide());
+        tradeDto.setTradeId(trade.getId());
+        Order makerorder = orderRepository.findByOrderId(trade.getMakerOrderId());
+        tradeDto.setMakeruserId(makerorder.getUserId());
+        tradeDto.setMakerfunds(String.valueOf(makerorder.getFunds()));
+        tradeDto.setMakerfillFees(makerorder.getFillFees() != null ? makerorder.getFillFees().stripTrailingZeros().toPlainString() : "0");
+        tradeDto.setMakerfilledSize(String.valueOf(makerorder.getFilledSize()));
+        tradeDto.setMakerexecutedValue(String.valueOf(makerorder.getExecutedValue()));
+        tradeDto.setMakerstatus(String.valueOf(makerorder.getStatus()));
         Order order = orderRepository.findByOrderId(trade.getTakerOrderId());
-        tradeDto.setTradeId(order.getId());
-        tradeDto.setTakeruserId(trade.getTakerOrderId());
-        tradeDto.setMakeruserId(trade.getMakerOrderId());
-        tradeDto.setMakerfunds(String.valueOf(trade.getPrice()));
-        tradeDto.setMakerfillFees( order.getFillFees() != null ? order.getFillFees().stripTrailingZeros().toPlainString() : "0");
-        tradeDto.setMakerfilledSize(String.valueOf(order.getFilledSize()));
-        tradeDto.setMakerexecutedValue(String.valueOf(order.getExecutedValue()));
-        tradeDto.setMakerstatus(String.valueOf(order.getStatus()));
+        tradeDto.setTakeruserId(order.getUserId());
         tradeDto.setTakerfunds(String.valueOf(order.getFunds()));
-        tradeDto.setTakerfillFees(String.valueOf(trade.getPrice()));
+        tradeDto.setTakerfillFees(order.getFillFees() != null ? order.getFillFees().stripTrailingZeros().toPlainString() : "0");
         tradeDto.setTakerfilledSize(String.valueOf(order.getFilledSize()));
-        tradeDto.setTakerexecutedValue(String.valueOf(order.getExecutedValue()));
+        tradeDto.setTakerexecutedValue(String.valueOf(makerorder.getExecutedValue()));
         tradeDto.setTakerstatus(String.valueOf(order.getStatus()));
         if (trade.getStatus() == null ){
-        tradeDto.setStatus(String.valueOf(order.getStatus()));
+            tradeDto.setStatus(String.valueOf(order.getStatus()));
         }
         else {
             tradeDto.setStatus(trade.getStatus());
@@ -199,4 +263,87 @@ public class ProductController {
         return tradeDto;
     }
 
+
+//
+//    private TradeDto tradeDto(Trade trade) {
+//        TradeDto tradeDto = new TradeDto();
+//        tradeDto.setProductId(trade.getProductId());
+//        tradeDto.setTakerOrderId(trade.getTakerOrderId());
+//        tradeDto.setMakerOrderId(trade.getMakerOrderId());
+//        tradeDto.setStatus(trade.getStatus());
+//        tradeDto.setSequence(trade.getSequence());
+//        tradeDto.setTime(trade.getTime());
+//        tradeDto.setPrice(trade.getPrice());
+//        tradeDto.setSize(trade.getSize());
+//        tradeDto.setSide(trade.getSide());
+//        Order order = orderRepository.findByOrderId(trade.getTakerOrderId());
+//        tradeDto.setTradeId(order.getId());
+//        tradeDto.setTakeruserId(trade.getTakerOrderId());
+//        tradeDto.setMakeruserId(trade.getMakerOrderId());
+//        tradeDto.setMakerfunds(String.valueOf(trade.getPrice()));
+//        tradeDto.setMakerfillFees( order.getFillFees() != null ? order.getFillFees().stripTrailingZeros().toPlainString() : "0");
+//        tradeDto.setMakerfilledSize(String.valueOf(order.getFilledSize()));
+//        tradeDto.setMakerexecutedValue(String.valueOf(order.getExecutedValue()));
+//        tradeDto.setMakerstatus(String.valueOf(order.getStatus()));
+//        tradeDto.setTakerfunds(String.valueOf(order.getFunds()));
+//        tradeDto.setTakerfillFees(String.valueOf(trade.getPrice()));
+//        tradeDto.setTakerfilledSize(String.valueOf(order.getFilledSize()));
+//        tradeDto.setTakerexecutedValue(String.valueOf(order.getExecutedValue()));
+//        tradeDto.setTakerstatus(String.valueOf(order.getStatus()));
+//        if (trade.getStatus() == null ){
+//        tradeDto.setStatus(String.valueOf(order.getStatus()));
+//        }
+//        else {
+//            tradeDto.setStatus(trade.getStatus());
+//        }
+//        return tradeDto;
+//    }
+
+    public class tradeStatusResponse {
+        private final String status;
+        private final String type;
+        public tradeStatusResponse(String status, String type) {
+            this.status = status;
+            this.type = type;
+        }
+    }
+
+    private TradeEmitDto tradeEmits(TradeEmit trade) {
+        TradeEmitDto tradeEmitDto = new TradeEmitDto();
+        tradeEmitDto.setProductId(trade.getProductId());
+        tradeEmitDto.setTakerOrderId(trade.getTakerOrderId());
+        tradeEmitDto.setMakerOrderId(trade.getMakerOrderId());
+        tradeEmitDto.setStatus(trade.getStatus());
+        tradeEmitDto.setSequence(trade.getSequence());
+        tradeEmitDto.setTime(trade.getTime());
+        tradeEmitDto.setPrice(trade.getPrice());
+        tradeEmitDto.setSize(trade.getSize());
+        tradeEmitDto.setSide(trade.getSide());
+        tradeEmitDto.setTradeId(trade.getProductId());
+        Order makerorder = orderRepository.findByOrderId(trade.getMakerOrderId());
+        tradeEmitDto.setMakeruserId(makerorder.getUserId());
+        tradeEmitDto.setMakerfunds(String.valueOf(makerorder.getFunds()));
+        tradeEmitDto.setMakerfillFees(makerorder.getFillFees() != null ? makerorder.getFillFees().stripTrailingZeros().toPlainString() : "0");
+        tradeEmitDto.setMakerfilledSize(String.valueOf(makerorder.getFilledSize()));
+        tradeEmitDto.setMakerexecutedValue(String.valueOf(makerorder.getExecutedValue()));
+        tradeEmitDto.setMakerstatus(String.valueOf(makerorder.getStatus()));
+        Order order = orderRepository.findByOrderId(trade.getTakerOrderId());
+        tradeEmitDto.setTakeruserId(order.getUserId());
+        tradeEmitDto.setTakerfunds(String.valueOf(order.getFunds()));
+        tradeEmitDto.setTakerfillFees(order.getFillFees() != null ? order.getFillFees().stripTrailingZeros().toPlainString() : "0");
+        tradeEmitDto.setTakerfilledSize(String.valueOf(order.getFilledSize()));
+        tradeEmitDto.setTakerexecutedValue(String.valueOf(makerorder.getExecutedValue()));
+        tradeEmitDto.setTakerstatus(String.valueOf(order.getStatus()));
+        if (trade.getStatus() == null ){
+            tradeEmitDto.setStatus(String.valueOf(order.getStatus()));
+        }
+        else {
+            tradeEmitDto.setStatus(trade.getStatus());
+        }
+        return tradeEmitDto;
+    }
+
+
 }
+
+

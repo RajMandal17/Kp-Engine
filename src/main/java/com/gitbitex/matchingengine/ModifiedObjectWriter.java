@@ -1,7 +1,13 @@
 package com.gitbitex.matchingengine;
 
 import com.alibaba.fastjson.JSON;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gitbitex.kafka.KafkaMessageProducer;
+import com.gitbitex.marketdata.entity.Trade;
+import com.gitbitex.marketdata.repository.TradeEmitRepository;
+import com.gitbitex.marketdata.repository.TradeRepository;
 import com.gitbitex.matchingengine.command.Command;
 import com.gitbitex.matchingengine.message.OrderBookMessage;
 import com.gitbitex.stripexecutor.StripedExecutorService;
@@ -11,17 +17,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PreDestroy;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
 @Component
@@ -35,6 +48,8 @@ public class ModifiedObjectWriter implements EngineListener {
             .builder("gbe.matching-engine.modified-object.saved")
             .register(Metrics.globalRegistry);
     private final RTopic accountTopic;
+    private final TradeEmitRepository tradeEmitRepository;
+    private  final TradeRepository tradeRepository;
     private final RTopic orderTopic;
     private final RTopic orderBookMessageTopic;
     private final ConcurrentLinkedQueue<ModifiedObjectList> modifiedObjectsQueue = new ConcurrentLinkedQueue<>();
@@ -43,11 +58,13 @@ public class ModifiedObjectWriter implements EngineListener {
     private final StripedExecutorService redisExecutor = new StripedExecutorService(Runtime.getRuntime().availableProcessors());
     private long lastCommandOffset;
 
-    public ModifiedObjectWriter(KafkaMessageProducer producer, RedissonClient redissonClient) {
+    public ModifiedObjectWriter(KafkaMessageProducer producer, RedissonClient redissonClient, TradeEmitRepository tradeEmitRepository, TradeRepository tradeRepository) {
         this.producer = producer;
         this.accountTopic = redissonClient.getTopic("account", StringCodec.INSTANCE);
         this.orderTopic = redissonClient.getTopic("order", StringCodec.INSTANCE);
         this.orderBookMessageTopic = redissonClient.getTopic("orderBookLog", StringCodec.INSTANCE);
+        this.tradeEmitRepository = tradeEmitRepository;
+        this.tradeRepository = tradeRepository;
         startMainTask();
     }
 
@@ -112,23 +129,104 @@ public class ModifiedObjectWriter implements EngineListener {
             });
         });
     }
-
     private void save(AtomicLong savedCounter, Trade trade) {
         kafkaExecutor.execute(trade.getProductId(), () -> {
-            producer.sendTrade(trade, (m, e) -> {
-                savedCounter.incrementAndGet();
-                modifiedObjectSavedCounter.increment();
-            });
+            try {
+                producer.sendTrade(trade, (m, e) -> {
+                    savedCounter.incrementAndGet();
+                    modifiedObjectSavedCounter.increment();
+                });
 
-            RestTemplate restTemplate = new RestTemplate();
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Trade> requestEntity = new HttpEntity<>(trade, headers);
-            String apiUrl = "http://localhost:3000/api/tradehistory";
-            restTemplate.postForObject(apiUrl, requestEntity, String.class);
+                // Check if the API is reachable
+                if (isApiReachable("http://localhost:3000/api/tradehistory")) {
+                    RestTemplate restTemplate = new RestTemplate();
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.APPLICATION_JSON);
+                    HttpEntity<Trade> requestEntity = new HttpEntity<>(trade, headers);
+                    trade.setStatus("0");
+                    String apiUrl = "http://localhost:3000/api/tradehistory";
+
+                    ResponseEntity<String> responseEntity = restTemplate.postForEntity(apiUrl, requestEntity, String.class);
+
+                    if (responseEntity.getStatusCode() == HttpStatus.OK) {
+                        // Assuming the response is a JSON object with a "status" field
+                        String responseBody = responseEntity.getBody();
+                        JsonNode jsonNode = new ObjectMapper().readTree(responseBody);
+
+                        if (jsonNode.has("status") && jsonNode.get("status").asInt() == 200) {
+                            // Response status is 200, save to tradeRepository
+                            tradeRepository.save(trade);
+                            logger.info("Trade saved to tradeRepository: {}", trade);
+                        } else {
+                            logger.info("else condition: {}", trade);
+                        }
+                    }
+                } else {
+                    // API not reachable, log and save to both repositories
+                    logger.warn("API not reachable. Saving to both repositories.");
+                    tradeRepository.save(trade);
+                    tradeEmitRepository.save(TradeEmitDto(trade));
+                    logger.info("Trade saved to tradeEmitRepository: {}", trade);
+                }
+            } catch (HttpClientErrorException e) {
+                handleHttpClientErrorException(e, trade);
+            } catch (HttpServerErrorException e) {
+                handleHttpServerErrorException(e, trade);
+            } catch (Exception e) {
+                handleGeneralException(e, trade);
+            }
         });
-
     }
+
+
+    private boolean isApiReachable(String apiUrl) {
+        try {
+            URL url = new URL(apiUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(2000); // Set timeout to 2 seconds
+            connection.connect();
+            connection.disconnect();
+            return true;
+        } catch (IOException e) {
+            // Log or handle the exception if needed
+            return false;
+        }
+    }
+
+
+    private TradeEmit TradeEmitDto(Trade trade) {
+
+        TradeEmit tradeEmit = new TradeEmit();
+        tradeEmit.setProductId(trade.getProductId());
+        tradeEmit.setSize(trade.getSize());
+        tradeEmit.setPrice(trade.getPrice());
+        tradeEmit.setFunds(trade.getFunds());
+        tradeEmit.setSequence(trade.getSequence());
+        tradeEmit.setSide(trade.getSide());
+        tradeEmit.setTime(trade.getTime());
+        tradeEmit.setStatus("0");
+        tradeEmit.setMakerOrderId(trade.getMakerOrderId());
+        tradeEmit.setTakerOrderId(trade.getTakerOrderId());
+   //     tradeEmitRepository.save(tradeEmit);
+
+       return tradeEmit;
+    }
+
+    private void handleHttpClientErrorException(HttpClientErrorException e, Trade trade) {
+
+        logger.error("HTTP client error occurred: {}", e.getMessage(), e);
+    }
+
+    private void handleHttpServerErrorException(HttpServerErrorException e, Trade trade) {
+
+        logger.error("HTTP server error occurred: {}", e.getMessage(), e);
+    }
+
+    private void handleGeneralException(Exception e, Trade trade) {
+
+        logger.error("Exception occurred during save: {}", e.getMessage(), e);
+    }
+
 
     private void save(AtomicLong savedCounter, OrderBookMessage orderBookMessage) {
         savedCounter.incrementAndGet();

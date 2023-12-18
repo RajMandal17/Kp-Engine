@@ -19,7 +19,9 @@ public class Trade {
     private String makerOrderId;
     private BigDecimal price;
     private BigDecimal size;
+    private BigDecimal funds;
     private OrderSide side;
     private Date time;
     private String status;
+
 }

@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.gitbitex.enums.OrderSide;
 import com.gitbitex.enums.OrderStatus;
 import com.gitbitex.enums.OrderType;
+import com.gitbitex.marketdata.entity.Trade;
 import com.gitbitex.matchingengine.message.OrderDoneMessage;
 import com.gitbitex.matchingengine.message.OrderMatchMessage;
 import com.gitbitex.matchingengine.message.OrderOpenMessage;

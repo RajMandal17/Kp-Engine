@@ -1,3 +1,4 @@
+
 package com.gitbitex.openapi.model;
 
 import com.gitbitex.enums.OrderSide;
@@ -9,7 +10,7 @@ import java.util.Date;
 
 @Getter
 @Setter
-public class TradeDto {
+public class TradeEmitDto {
 
 
     private long sequence;
@@ -24,7 +25,6 @@ public class TradeDto {
     private String takeruserId;
     private String makeruserId;
     private String tradeId;
-    private BigDecimal funds;
     private String makerfunds;
     private String makerfillFees;
     private String makerfilledSize;

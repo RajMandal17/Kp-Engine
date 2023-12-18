@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Random;
@@ -92,7 +93,7 @@ public class CoinbaseTrader {
         PlaceOrderRequest order = new PlaceOrderRequest();
         order.setProductId("BTC-USDT");
         order.setClientOid(UUID.randomUUID().toString());
-        order.setPrice(String.valueOf(new Random().nextInt(10) + 1));
+        order.setPrice(BigDecimal.valueOf(new Random().nextInt(10) + 1));
         order.setSize(String.valueOf(new Random().nextInt(10) + 1));
         order.setFunds(String.valueOf(new Random().nextInt(10) + 1));
         order.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
@@ -152,7 +153,7 @@ public class CoinbaseTrader {
                                 PlaceOrderRequest order = new PlaceOrderRequest();
                                 order.setProductId(productId);
                                 order.setClientOid(UUID.randomUUID().toString());
-                                order.setPrice(message.getPrice());
+                                order.setPrice(new BigDecimal(message.getPrice()));//new BigDecimal(String.valueOf(request.getPrice()
                                 order.setSize(message.getSize());
                                 order.setFunds(message.getFunds());
                                 order.setSide(message.getSide().toLowerCase());

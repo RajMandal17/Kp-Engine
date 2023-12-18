@@ -1,6 +1,6 @@
 package com.gitbitex.matchingengine.message;
 
-import com.gitbitex.matchingengine.Trade;
+import com.gitbitex.marketdata.entity.Trade;
 import lombok.Getter;
 import lombok.Setter;
 

@@ -1,6 +1,7 @@
 package com.gitbitex.marketdata.repository;
 
 import com.gitbitex.marketdata.entity.Trade;
+import com.gitbitex.matchingengine.TradeEmit;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
@@ -12,44 +13,45 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-@Component
-public class TradeRepository {
-    private final MongoCollection<Trade> collection;
 
-    public TradeRepository(MongoDatabase database) {
-        this.collection = database.getCollection(Trade.class.getSimpleName().toLowerCase(), Trade.class);
+@Component
+public class TradeEmitRepository {
+    private final MongoCollection<TradeEmit> collection;
+
+    public TradeEmitRepository(MongoDatabase database) {
+        this.collection = database.getCollection(TradeEmit.class.getSimpleName().toLowerCase(), TradeEmit.class);
         this.collection.createIndex(Indexes.descending("productId", "sequence"));
     }
 
 //
 
-public Trade findByTradeId(String tradeId) {
+    public TradeEmit findByTradeId(String tradeId) {
         return this.collection
                 .find(Filters.eq("_id", tradeId))
                 .first();
     }
-//
-    public List<Trade> findByProductId(String productId, int limit) {
+    //
+    public List<TradeEmit> findByProductId(String productId, int limit) {
         return this.collection.find(Filters.eq("productId", productId))
                 .sort(Sorts.descending("sequence"))
                 .limit(limit)
                 .into(new ArrayList<>());
     }
 
-    public List<Trade> findByProductId(String id) {
+    public List<TradeEmit> findByProductId(String id) {
         return this.collection.find(Filters.eq("_id", id))
                 .sort(Sorts.descending("sequence"))
                 .into(new ArrayList<>());
     }
 
-    public List<Trade> findAllTrade(String status, int limit) {
+    public List<TradeEmit> findAllTrade(String status, int limit) {
         Bson filter = Filters.eq("status", status);
         return this.collection.find(filter)
                 .sort(Sorts.descending("sequence"))
                 .limit(limit)
                 .into(new ArrayList<>());
     }
-    public List<Trade> findTradeByOrderId(String orderId, int limit) {
+    public List<TradeEmit> findTradeByOrderId(String orderId, int limit) {
         Bson filter = Filters.or(
                 Filters.eq("takerOrderId", orderId),
                 Filters.eq("makerOrderId", orderId)
@@ -61,23 +63,29 @@ public Trade findByTradeId(String tradeId) {
                 .into(new ArrayList<>());
     }
 
-    public void saveAll(Collection<Trade> trades) {
-        List<WriteModel<Trade>> writeModels = new ArrayList<>();
-        for (Trade item : trades) {
+    public void saveAll(Collection<TradeEmit> trades) {
+        List<WriteModel<TradeEmit>> writeModels = new ArrayList<>();
+        for (TradeEmit item : trades) {
             item.setStatus("0");
-            Bson filter = Filters.eq("_id", item.getId());
-            WriteModel<Trade> writeModel = new ReplaceOneModel<>(filter, item, new ReplaceOptions().upsert(true));
+            Bson filter = Filters.eq("_id", item.getProductId());
+            WriteModel<TradeEmit> writeModel = new ReplaceOneModel<>(filter, item, new ReplaceOptions().upsert(true));
             writeModels.add(writeModel);
         }
         collection.bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
     }
 
 
-    public void save(Trade trade) {
+//    public void save(TradeEmit trade) {
+//
+//        Bson filter = Filters.eq("_id", trade.getProductId());
+//        ReplaceOneModel<TradeEmit> writeModel = new ReplaceOneModel<>(filter, trade, new ReplaceOptions().upsert(true));
+//        collection.replaceOne(filter, trade, new ReplaceOptions().upsert(true));
+//    }
 
-        Bson filter = Filters.eq("_id", trade.getId());
-        ReplaceOneModel<Trade> writeModel = new ReplaceOneModel<>(filter, trade, new ReplaceOptions().upsert(true));
-        collection.replaceOne(filter, trade, new ReplaceOptions().upsert(true));
+    public void save(TradeEmit trade) {
+        // Assuming 'collection' is an instance of MongoDB's MongoCollection<TradeEmit>
+        InsertOneModel<TradeEmit> writeModel = new InsertOneModel<>(trade);
+        collection.bulkWrite(Collections.singletonList(writeModel));
     }
 
 
