@@ -18,6 +18,7 @@ import com.gitbitex.matchingengine.message.OrderMatchMessage;
 import com.gitbitex.matchingengine.message.OrderMessage;
 import com.gitbitex.openapi.model.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController()
+@Slf4j
 @RequiredArgsConstructor
 public class ProductController {
     private final OrderBookSnapshotStore orderBookSnapshotStore;
@@ -136,37 +138,46 @@ public class ProductController {
         List<TradeEmit> trades = tradeEmitRepository.findAllTrade("0", 50);
         List<TradeEmitDto> tradeEmitDtos = new ArrayList<>();
         for (TradeEmit trade : trades) {
-            // Uncomment the condition if you want to filter trades based on status
-            // if (!StringUtils.isBlank(trade.getStatus())) {
+
             tradeEmitDtos.add(tradeEmits(trade));
-            // }
+
         }
         return tradeEmitDtos;
     }
 
-    @PostMapping("/api/tradeEmit/{id}")
-    public ResponseEntity<Map<String, String>> searchTradeEmitByProductId(@RequestBody @Valid TradeEmit request, @PathVariable String id) {
-        List<TradeEmit> trades = tradeEmitRepository.findByProductId(id);
+    @PostMapping("/api/tradeEmit/{tradeEmitId}")
+    public ResponseEntity<Map<String, String>> searchTradeEmitByProductId(@RequestBody @Valid TradeStatus request, @PathVariable String tradeEmitId) {
+        List<TradeEmit> trades = tradeEmitRepository.findByProductId(tradeEmitId);
 
         if (!trades.isEmpty()) {
             for (TradeEmit tradeEmit : trades) {
-                tradeEmit.setStatus(request.getStatus());
-                tradeEmitRepository.save(tradeEmit);
+                if(!tradeEmit.getStatus().equals("0")){
+                    Map<String, String> response = new HashMap<>();
+                    response.put("status", "400");
+                    response.put("id", tradeEmitId);
+                    response.put("message", "Status already updated ");
+                    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+                } else {
+                    tradeEmit.setStatus(request.getStatus());
+                    tradeEmitRepository.updateStatusByTradeEmitId(tradeEmitId, "1");
+                }
             }
             Map<String, String> response = new HashMap<>();
             response.put("status", "200");
-            response.put("id", id);
+            response.put("id", tradeEmitId);
             response.put("message", "updated successfully");
             return new ResponseEntity<>(response, HttpStatus.OK);
         } else {
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("status", "400");
-            errorResponse.put("id", id);
+            errorResponse.put("id", tradeEmitId);
             errorResponse.put("message", "Not updated");
             return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
         }
-
     }
+
+
+
 
 
     @GetMapping("/api/trade/{orderId}")
@@ -311,9 +322,10 @@ public class ProductController {
     private TradeEmitDto tradeEmits(TradeEmit trade) {
         TradeEmitDto tradeEmitDto = new TradeEmitDto();
         tradeEmitDto.setProductId(trade.getProductId());
+        tradeEmitDto.setTradeEmitId(String.valueOf(trade.getTradeEmitId()));
         tradeEmitDto.setTakerOrderId(trade.getTakerOrderId());
         tradeEmitDto.setMakerOrderId(trade.getMakerOrderId());
-        tradeEmitDto.setStatus(trade.getStatus());
+     //   tradeEmitDto.setStatus(trade.getStatus());
         tradeEmitDto.setSequence(trade.getSequence());
         tradeEmitDto.setTime(trade.getTime());
         tradeEmitDto.setPrice(trade.getPrice());
