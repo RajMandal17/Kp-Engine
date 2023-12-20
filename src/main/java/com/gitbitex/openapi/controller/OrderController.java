@@ -7,17 +7,17 @@ import com.gitbitex.enums.TimeInForce;
 import com.gitbitex.feed.message.OrderFeedMessage;
 import com.gitbitex.marketdata.entity.Order;
 import com.gitbitex.marketdata.entity.Product;
-import com.gitbitex.marketdata.entity.Trade;
 import com.gitbitex.marketdata.entity.User;
 import com.gitbitex.marketdata.repository.OrderRepository;
 import com.gitbitex.marketdata.repository.ProductRepository;
-import com.gitbitex.marketdata.repository.TradeEmitRepository;
-import com.gitbitex.matchingengine.TradeEmit;
 import com.gitbitex.matchingengine.command.CancelOrderCommand;
 import com.gitbitex.matchingengine.command.MatchingEngineCommandProducer;
 import com.gitbitex.matchingengine.command.PlaceOrderCommand;
 import com.gitbitex.matchingengine.message.OrderMessage;
-import com.gitbitex.openapi.model.*;
+import com.gitbitex.openapi.model.OrderDto;
+import com.gitbitex.openapi.model.PagedList;
+import com.gitbitex.openapi.model.PlaceCronOrder;
+import com.gitbitex.openapi.model.PlaceOrderRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +29,6 @@ import org.springframework.web.server.ResponseStatusException;
 import javax.validation.Valid;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -42,7 +41,6 @@ public class OrderController {
     private final OrderRepository orderRepository;
     private final MatchingEngineCommandProducer matchingEngineCommandProducer;
     private final ProductRepository productRepository;
-    private final TradeEmitRepository tradeEmitRepository;
 
 
 
@@ -87,7 +85,7 @@ public class OrderController {
         orderDto.setProductId(command.getProductId());
         orderDto.setUserId(command.getUserId());
         //orderDto.setUpdatedAt(String.valueOf(currentUser.getUpdatedAt()));
-       orderDto.setClientOid(request.getClientOid());
+        orderDto.setClientOid(request.getClientOid());
         orderDto.setSize(String.valueOf(command.getSize()));
         orderDto.setFunds(String.valueOf(command.getFunds()));
         orderDto.setFilledSize(request.getSize());
@@ -107,23 +105,104 @@ public class OrderController {
         orderDto.setSide(String.valueOf(command.getOrderSide()));
         orderDto.setTimeInForce(request.getTimeInForce());
         orderDto.setStatus("new");
-       orderDto.setSettled(msg.isSettled());
+        orderDto.setSettled(msg.isSettled());
         return orderDto;
     }
 
 
-//    
+    //  @PostMapping(value = "/orderEmit/{id}")
+    public OrderDto placeOrderBaseOnVolume(@RequestBody @Valid PlaceCronOrder request, @PathVariable String id) {
+
+        Product product = productRepository.findById(request.getProductId());
+        if (product == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product not found: " + request.getProductId());
+        }
+        if(Integer.parseInt(request.getVolume()) > 300000){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Volume is too high: " + request.getVolume());
+        }
+        if (Integer.parseInt(String.valueOf(request.getMaxPrice())) >= Integer.parseInt(String.valueOf(request.getPrice())) &&
+                Integer.parseInt(String.valueOf(request.getPrice())) >= Integer.parseInt(String.valueOf(request.getMinSize()))) {
+
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price is not in range: " + request.getPrice());
+        }
+        if (Integer.parseInt(String.valueOf(request.getMaxSize())) >= Integer.parseInt(String.valueOf(request.getSize())) &&
+                Integer.parseInt(String.valueOf(request.getSize())) >= Integer.parseInt(String.valueOf(request.getMinSize()))) {
+
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Size is not in range: " + request.getSize());
+        }
+        if(Integer.parseInt(String.valueOf(request.getSpread())) >= 0.10){
+
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Spread value is not in range: " + request.getSpread());
+        }
+
+
+        OrderType type = OrderType.valueOf(request.getType().toUpperCase());
+        OrderSide side = OrderSide.valueOf(request.getSide().toUpperCase());
+        BigDecimal size = new BigDecimal(String.valueOf(request.getSize()));
+        BigDecimal price = request.getPrice() != null ? new BigDecimal(String.valueOf(request.getPrice())) : null;
+        BigDecimal funds = request.getFunds() != null ? new BigDecimal(request.getFunds()) : null;
+        TimeInForce timeInForce = request.getTimeInForce() != null
+                ? TimeInForce.valueOf(request.getTimeInForce().toUpperCase())
+                : null;
+
+        PlaceOrderCommand command = new PlaceOrderCommand();
+        command.setProductId(request.getProductId());
+        command.setOrderId(UUID.randomUUID().toString());
+        command.setUserId(id.toString());
+        command.setOrderType(type);
+        command.setOrderSide(side);
+        command.setSize(size);
+        command.setPrice(price);
+        command.setFunds(funds);
+        command.setTime(new Date());
+        command.setLast_trade_id(request.getLast_trade_id());
+        formatPlaceOrderCommand(command, product);
+        validatePlaceOrderCommand(command);
+        matchingEngineCommandProducer.send(command, null);
+        OrderFeedMessage msg = new OrderFeedMessage();
+        OrderMessage ordermsg = new OrderMessage();
+        OrderDto orderDto = new OrderDto();
+
+        orderDto.setId(command.getOrderId());
+        orderDto.setCreatedAt(String.valueOf(command.getTime()));
+        orderDto.setProductId(command.getProductId());
+        orderDto.setUserId(command.getUserId());
+        //orderDto.setUpdatedAt(String.valueOf(currentUser.getUpdatedAt()));
+        orderDto.setClientOid(request.getClientOid());
+        orderDto.setSize(String.valueOf(command.getSize()));
+        orderDto.setFunds(String.valueOf(command.getFunds()));
+        orderDto.setFilledSize(String.valueOf(request.getSize()));
+        BigDecimal fund = ordermsg.getFunds();
+        BigDecimal remainingFunds = ordermsg.getRemainingFunds();
+
+        if (fund != null && remainingFunds != null) {
+            BigDecimal executedValue = fund.subtract(remainingFunds).stripTrailingZeros();
+            orderDto.setExecutedValue(executedValue.toPlainString());
+        } else {
+            // Set a default value when either funds or remainingFunds is null
+            orderDto.setExecutedValue("0");
+        }
+        orderDto.setPrice(String.valueOf(command.getPrice() != null ? command.getPrice(): BigDecimal.ZERO));
+        orderDto.setFillFees(ordermsg.getFillFees() != null ? ordermsg.getFillFees().stripTrailingZeros().toPlainString() : "0");
+        orderDto.setType(String.valueOf(command.getOrderType()));
+        orderDto.setSide(String.valueOf(command.getOrderSide()));
+        orderDto.setTimeInForce(request.getTimeInForce());
+        orderDto.setStatus("new");
+        orderDto.setSettled(msg.isSettled());
+        return orderDto;
+    }
+
+
+    //
     @GetMapping("/orderstatus/{orderId}")
     public ResponseEntity<Object> orderList(@PathVariable String orderId) {
         Order order = orderRepository.findByOrderId(orderId);
         if (order == null) {
             return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "nil"));
         }
-            return ResponseEntity.ok(order);
-        }
-
-
-
+        return ResponseEntity.ok(order);
+    }
+    //
 
 
     @DeleteMapping("/orders/{orderId}")
@@ -147,7 +226,7 @@ public class OrderController {
         }
         // If cancellation is successful, return a success response
         return ResponseEntity.ok(new OrderCancellationResponse("success", "cancelling"));
-         }
+    }
     // Response class for JSON structure
     private static class OrderCancellationResponse {
         private final String status;
@@ -188,7 +267,7 @@ public class OrderController {
 
 
 
-//
+    //
 //    @DeleteMapping("/orders")
 //    @SneakyThrows
 //    public void cancelOrders(String productId, String side, @RequestAttribute(required = false) User currentUser) {
@@ -229,9 +308,9 @@ public class OrderController {
     }
     @GetMapping("/cancelorderslist")
     public PagedList<OrderDto> listCancelOrders(@RequestParam(defaultValue = "1") int page,
-                                          @RequestParam(defaultValue = "50") int pageSize) {
+                                                @RequestParam(defaultValue = "50") int pageSize) {
 
-         String status="CANCELLED";
+        String status="CANCELLED";
         OrderStatus orderStatus = status != null ? OrderStatus.valueOf(status.toUpperCase()) : null;
 
         PagedList<Order> orderPage = orderRepository.findAll( orderStatus, page, pageSize);
@@ -243,11 +322,11 @@ public class OrderController {
     private OrderDto orderDto(Order order) {
         OrderDto orderDto = new OrderDto();
         orderDto.setId(order.getId());
-       orderDto.setUserId(order.getUserId());
-       orderDto.setFillFees(String.valueOf(order.getFilledSize() != null ? order.getFilledSize(): BigDecimal.ZERO));
-       orderDto.setUpdatedAt(String.valueOf(order.getUpdatedAt()));
-       orderDto.setClientOid(order.getClientOid());
-       orderDto.setTimeInForce(order.getTimeInForce());
+        orderDto.setUserId(order.getUserId());
+        orderDto.setFillFees(String.valueOf(order.getFilledSize() != null ? order.getFilledSize(): BigDecimal.ZERO));
+        orderDto.setUpdatedAt(String.valueOf(order.getUpdatedAt()));
+        orderDto.setClientOid(order.getClientOid());
+        orderDto.setTimeInForce(order.getTimeInForce());
         orderDto.setPrice(String.valueOf(order.getPrice() != null ? order.getPrice(): BigDecimal.ZERO));
         orderDto.setSize(order.getSize().toPlainString());
         orderDto.setFilledSize(String.valueOf(order.getFilledSize() != null ? order.getFilledSize(): BigDecimal.ZERO));
@@ -274,8 +353,8 @@ public class OrderController {
 
         switch (command.getOrderType()) {
             case LIMIT -> {
-              //  size = size.setScale(product.getBaseScale() );
-              //  price = price.setScale(product.getQuoteScale());
+                //  size = size.setScale(product.getBaseScale() );
+                //  price = price.setScale(product.getQuoteScale());
                 funds = side == OrderSide.BUY ? size.multiply(price) : BigDecimal.ZERO;
             }
             case MARKET -> {

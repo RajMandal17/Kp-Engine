@@ -3,9 +3,11 @@ package com.gitbitex.demo;
 import com.alibaba.fastjson.JSON;
 import com.gitbitex.AppProperties;
 import com.gitbitex.marketdata.entity.User;
+import com.gitbitex.marketdata.repository.TradeRepository;
 import com.gitbitex.openapi.controller.AdminController;
 import com.gitbitex.openapi.controller.AdminController.PutProductRequest;
 import com.gitbitex.openapi.controller.OrderController;
+import com.gitbitex.openapi.model.PlaceCronOrder;
 import com.gitbitex.openapi.model.PlaceOrderRequest;
 import com.google.common.util.concurrent.RateLimiter;
 import lombok.Getter;
@@ -39,6 +41,7 @@ public class CoinbaseTrader {
     private final ScheduledExecutorService scheduledExecutor = Executors.newScheduledThreadPool(1);
     private final AppProperties appProperties;
     private final AdminController adminController;
+    private final TradeRepository tradeRepository;
 
     @PostConstruct
     public void init() throws URISyntaxException {
@@ -57,6 +60,7 @@ public class CoinbaseTrader {
         scheduledExecutor.scheduleAtFixedRate(() -> {
             try {
                 test(user);
+
                 if (true) {
                     return;
                 }
@@ -99,8 +103,35 @@ public class CoinbaseTrader {
         order.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
         order.setType("limit");
         String objectAsString = user.toString();
-     //   orderController.placeOrder(order, objectAsString);
+        orderController.placeOrder(order, objectAsString);
     }
+
+
+    public void volumeBaseOrder(User user){
+        PlaceCronOrder order = new PlaceCronOrder();
+        order.setProductId("USDT");
+        order.setVolume(String.valueOf(tradeRepository.countTradesLast24Hours(String.valueOf(0))));
+        order.setMaxPrice(BigDecimal.valueOf(89.10));
+        order.setMinPrice(BigDecimal.valueOf(88.90));
+        BigDecimal randomPrice = order.getMinPrice()
+                .add(new BigDecimal(Math.random()).multiply(order.getMaxPrice().subtract(order.getMinPrice())));
+        order.setPrice(randomPrice);
+        BigDecimal randomSize = order.getMinSize()
+                .add(new BigDecimal(Math.random()).multiply(order.getMaxSize().subtract(order.getMinSize())));
+        order.setMinSize(BigDecimal.valueOf(500));
+        order.setMaxSize(BigDecimal.valueOf(50000));
+        order.setSize(randomSize);
+        order.setClientOid(UUID.randomUUID().toString());
+        order.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
+        order.setType("limit");
+        order.setSpread(BigDecimal.valueOf(0.10));
+        order.setFunds(String.valueOf(order.getPrice().multiply(order.getSize())));
+        String objectAsString = user.toString();
+        orderController.placeOrderBaseOnVolume(order, objectAsString);
+    }
+
+
+
 
     @Getter
     @Setter
