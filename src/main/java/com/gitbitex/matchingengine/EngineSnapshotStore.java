@@ -100,7 +100,7 @@ public class EngineSnapshotStore {
                 session.commitTransaction();
             } catch (Exception e) {
                 session.abortTransaction();
-                throw new RuntimeException(e);
+        //        throw new RuntimeException(e);
             }
         }
     }

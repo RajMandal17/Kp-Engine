@@ -12,6 +12,7 @@ import com.gitbitex.marketdata.entity.User;
 import com.gitbitex.marketdata.repository.OrderRepository;
 import com.gitbitex.marketdata.repository.ProductRepository;
 import com.gitbitex.marketdata.repository.TradeEmitRepository;
+import com.gitbitex.matchingengine.PlaceCronOrder;
 import com.gitbitex.matchingengine.TradeEmit;
 import com.gitbitex.matchingengine.command.CancelOrderCommand;
 import com.gitbitex.matchingengine.command.MatchingEngineCommandProducer;
@@ -29,10 +30,9 @@ import org.springframework.web.server.ResponseStatusException;
 import javax.validation.Valid;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -48,13 +48,10 @@ public class OrderController {
 
     @PostMapping(value = "/orders/{id}")
     public OrderDto placeOrder(@RequestBody @Valid PlaceOrderRequest request,@PathVariable String id) {
-
-
         Product product = productRepository.findById(request.getProductId());
         if (product == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product not found: " + request.getProductId());
         }
-
         OrderType type = OrderType.valueOf(request.getType().toUpperCase());
         OrderSide side = OrderSide.valueOf(request.getSide().toUpperCase());
         BigDecimal size = new BigDecimal(request.getSize());
@@ -67,7 +64,7 @@ public class OrderController {
         PlaceOrderCommand command = new PlaceOrderCommand();
         command.setProductId(request.getProductId());
         command.setOrderId(UUID.randomUUID().toString());
-        command.setUserId(id.toString());
+        command.setUserId(id);
         command.setOrderType(type);
         command.setOrderSide(side);
         command.setSize(size);
@@ -75,6 +72,7 @@ public class OrderController {
         command.setFunds(funds);
         command.setTime(new Date());
         command.setLast_trade_id(request.getLast_trade_id());
+
         formatPlaceOrderCommand(command, product);
         validatePlaceOrderCommand(command);
         matchingEngineCommandProducer.send(command, null);
@@ -87,10 +85,134 @@ public class OrderController {
         orderDto.setProductId(command.getProductId());
         orderDto.setUserId(command.getUserId());
         //orderDto.setUpdatedAt(String.valueOf(currentUser.getUpdatedAt()));
-       orderDto.setClientOid(request.getClientOid());
+        orderDto.setClientOid(request.getClientOid());
         orderDto.setSize(String.valueOf(command.getSize()));
         orderDto.setFunds(String.valueOf(command.getFunds()));
         orderDto.setFilledSize(request.getSize());
+        BigDecimal fund = ordermsg.getFunds();
+        BigDecimal remainingFunds = ordermsg.getRemainingFunds();
+
+        BigDecimal executedValue = null;
+        if (fund != null && remainingFunds != null) {
+            executedValue = fund.subtract(remainingFunds).stripTrailingZeros();
+            orderDto.setExecutedValue(executedValue.toPlainString());
+        } else {
+            orderDto.setExecutedValue("0");
+        }
+        orderDto.setPrice(String.valueOf(command.getPrice() != null ? command.getPrice() : BigDecimal.ZERO));
+        orderDto.setFillFees(ordermsg.getFillFees() != null ? ordermsg.getFillFees().stripTrailingZeros().toPlainString() : "0");
+        orderDto.setType(String.valueOf(command.getOrderType()));
+        orderDto.setSide(String.valueOf(command.getOrderSide()));
+        orderDto.setTimeInForce(request.getTimeInForce());
+        orderDto.setStatus(String.valueOf(OrderStatus.FILLED));
+        orderDto.setSettled(msg.isSettled());
+
+        Order order = new Order();
+        order.setId(orderDto.getId());
+        order.setCreatedAt(parseDate(orderDto.getCreatedAt()));
+        order.setUpdatedAt(parseDate(orderDto.getUpdatedAt()));
+        order.setProductId(orderDto.getProductId());
+        order.setFunds(orderDto.getFunds());
+        order.setPrice(new BigDecimal(orderDto.getPrice()));
+        order.setSize(new BigDecimal(orderDto.getSize()));
+        order.setFilledSize(new BigDecimal(orderDto.getFilledSize()));
+        order.setExecutedValue(new BigDecimal(orderDto.getExecutedValue()));
+        order.setFillFees(new BigDecimal(orderDto.getFillFees()));
+        order.setType(OrderType.valueOf(orderDto.getType()));
+        order.setSide(OrderSide.valueOf(orderDto.getSide()));
+        order.setStatus(OrderStatus.valueOf(orderDto.getStatus()));
+        order.setTimeInForce(orderDto.getTimeInForce());
+        order.setExecutedValue(executedValue);
+        order.setSettled(orderDto.isSettled());
+        orderRepository.save(order);
+
+        return orderDto;
+    }
+
+
+
+    private Date parseDate(String dateString) {
+        if (dateString == null) {
+            // If the date string is null, set the date to the current date and time
+            return Calendar.getInstance().getTime();
+        }
+
+        try {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy", Locale.ENGLISH);
+            return dateFormat.parse(dateString);
+        } catch (ParseException e) {
+            // Handle the exception appropriately, e.g., log an error or return null
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    //  @PostMapping(value = "/orderEmit/{id}")
+    public OrderDto placeOrderBaseOnVolume(@RequestBody @Valid PlaceCronOrder request, @PathVariable String id) {
+        // Check if the product exists
+        Product product = productRepository.findById(request.getProductId());
+//        if (product == null) {
+//            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product not found: " + request.getProductId());
+//        }
+
+
+    /*    String timeInForceString = request.getTimeInForce().toUpperCase();
+        TimeInForce timeInForce;
+
+        try {
+            timeInForce = TimeInForce.valueOf(timeInForceString);
+        } catch (IllegalArgumentException e) {
+            // Handle the case where the string does not match any enum constant
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid TimeInForce: " + timeInForceString);
+        }
+*/
+        // Check if the requested volume is within the allowed threshold
+        BigDecimal volumeThreshold = BigDecimal.valueOf(300000);
+        BigDecimal requestVolume = new BigDecimal(String.valueOf(request.getVolume()));
+
+        if (requestVolume.compareTo(volumeThreshold) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Volume is too high: " + requestVolume);
+        }
+
+        // Process the order
+        OrderType type = OrderType.valueOf(request.getType().toUpperCase());
+        OrderSide side = OrderSide.valueOf(request.getSide().toUpperCase());
+        BigDecimal size = new BigDecimal(String.valueOf(request.getSize()));
+        BigDecimal price = request.getPrice() != null ? new BigDecimal(String.valueOf(request.getPrice())) : null;
+        BigDecimal funds = request.getFunds() != null ? new BigDecimal(String.valueOf(request.getFunds())) : null;
+
+
+        PlaceOrderCommand command = new PlaceOrderCommand();
+        command.setProductId(request.getProductId());
+        command.setOrderId(UUID.randomUUID().toString());
+        command.setUserId(id);
+        command.setOrderType(type);
+        command.setOrderSide(side);
+        command.setSize(size);
+        command.setPrice(price);
+        command.setFunds(funds);
+        command.setTime(new Date());
+        command.setLast_trade_id(request.getLast_trade_id());
+
+
+        formatPlaceOrderCommand(command, product);
+        validatePlaceOrderCommand(command);
+        matchingEngineCommandProducer.send(command, null);
+
+        // Create the OrderDto
+        OrderFeedMessage msg = new OrderFeedMessage();
+        OrderMessage ordermsg = new OrderMessage();
+        OrderDto orderDto = new OrderDto();
+
+        orderDto.setId(command.getOrderId());
+        orderDto.setCreatedAt(String.valueOf(command.getTime()));
+        orderDto.setProductId(command.getProductId());
+        orderDto.setUserId(command.getUserId());
+        orderDto.setClientOid(request.getClientOid());
+        orderDto.setSize(String.valueOf(command.getSize()));
+        orderDto.setFunds(String.valueOf(command.getFunds()));
+        orderDto.setFilledSize(String.valueOf(request.getSize()));
+
         BigDecimal fund = ordermsg.getFunds();
         BigDecimal remainingFunds = ordermsg.getRemainingFunds();
 
@@ -98,21 +220,20 @@ public class OrderController {
             BigDecimal executedValue = fund.subtract(remainingFunds).stripTrailingZeros();
             orderDto.setExecutedValue(executedValue.toPlainString());
         } else {
-            // Set a default value when either funds or remainingFunds is null
             orderDto.setExecutedValue("0");
         }
-        orderDto.setPrice(String.valueOf(command.getPrice() != null ? command.getPrice(): BigDecimal.ZERO));
+
+        orderDto.setPrice(String.valueOf(command.getPrice() != null ? command.getPrice() : BigDecimal.ZERO));
         orderDto.setFillFees(ordermsg.getFillFees() != null ? ordermsg.getFillFees().stripTrailingZeros().toPlainString() : "0");
         orderDto.setType(String.valueOf(command.getOrderType()));
         orderDto.setSide(String.valueOf(command.getOrderSide()));
-        orderDto.setTimeInForce(request.getTimeInForce());
+    //    orderDto.setTimeInForce(timeInForceString);
         orderDto.setStatus("new");
-       orderDto.setSettled(msg.isSettled());
+        orderDto.setSettled(msg.isSettled());
+
         return orderDto;
     }
 
-
-//    
     @GetMapping("/orderstatus/{orderId}")
     public ResponseEntity<Object> orderList(@PathVariable String orderId) {
         Order order = orderRepository.findByOrderId(orderId);

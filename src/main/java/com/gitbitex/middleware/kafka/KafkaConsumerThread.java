@@ -29,7 +29,7 @@ public abstract class KafkaConsumerThread<K, V> extends Thread {
 
     @Override
     public void run() {
-        logger.info("starting...");
+        logger.info("starting...KafkaConsumerThread");
         try {
             // subscribe
             doSubscribe();

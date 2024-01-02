@@ -18,4 +18,9 @@ public class ProductDto {
     private float quoteIncrement;
     private int baseScale;
     private int quoteScale;
+    private String productId;
+    private BigDecimal minPrice;
+    private BigDecimal maxPrice;
+    private BigDecimal orderSizeMin;
+    private BigDecimal orderSizeMax;
 }

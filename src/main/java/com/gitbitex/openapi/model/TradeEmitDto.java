@@ -12,7 +12,7 @@ import java.util.Date;
 @Setter
 public class TradeEmitDto {
 
-
+    private String tradeEmitId;
     private long sequence;
     private String productId;
     private String takerOrderId;

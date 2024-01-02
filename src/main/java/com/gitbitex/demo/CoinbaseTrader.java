@@ -1,8 +1,16 @@
 package com.gitbitex.demo;
 
 import com.alibaba.fastjson.JSON;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gitbitex.AppProperties;
+import com.gitbitex.marketdata.entity.Product;
 import com.gitbitex.marketdata.entity.User;
+import com.gitbitex.marketdata.entity.mm;
+import com.gitbitex.marketdata.repository.MMRepository;
+import com.gitbitex.marketdata.repository.ProductRepository;
+import com.gitbitex.marketdata.repository.TradeRepository;
+import com.gitbitex.matchingengine.PlaceCronOrder;
 import com.gitbitex.openapi.controller.AdminController;
 import com.gitbitex.openapi.controller.AdminController.PutProductRequest;
 import com.gitbitex.openapi.controller.OrderController;
@@ -15,13 +23,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.enums.ReadyState;
 import org.java_websocket.handshake.ServerHandshake;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+import com.gitbitex.*;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -35,28 +48,52 @@ import java.util.concurrent.TimeUnit;
 public class CoinbaseTrader {
     private static final RateLimiter rateLimiter = RateLimiter.create(10);
     private final OrderController orderController;
+    private final ProductRepository productRepository;
+    private final MMRepository mmRepository;
     private final ExecutorService executor = Executors.newFixedThreadPool(1);
     private final ScheduledExecutorService scheduledExecutor = Executors.newScheduledThreadPool(1);
     private final AppProperties appProperties;
     private final AdminController adminController;
+    private final TradeRepository tradeRepository;
 
     @PostConstruct
     public void init() throws URISyntaxException {
         logger.info("start");
 
         User user = adminController.createUser("test@test.com", "12345678");
-        PutProductRequest putProductRequest = new PutProductRequest();
-        putProductRequest.setBaseCurrency("BTC");
-        putProductRequest.setQuoteCurrency("USDT");
-        adminController.saveProduct(putProductRequest);
-        adminController.deposit(user.getId(), "BTC", "100000000000");
-        adminController.deposit(user.getId(), "USDT", "100000000000");
+//        PutProductRequest putProductRequest = new PutProductRequest();
+//        putProductRequest.setBaseCurrency("BTC");
+//        putProductRequest.setQuoteCurrency("USDT");
+//        adminController.saveProduct(putProductRequest);
+//        adminController.deposit(user.getId(), "BTC", "100000000000");
+//        adminController.deposit(user.getId(), "USDT", "100000000000");
+
+//        putProductRequest.setBaseCurrency("BCD");
+//        putProductRequest.setQuoteCurrency("USDT");
+//        adminController.saveProduct(putProductRequest);
+//        adminController.deposit(user.getId(), "BCD", "100000000000");
+//        adminController.deposit(user.getId(), "USDT", "100000000000");
+
+
 
         MyClient client = new MyClient(new URI("wss://ws-feed.exchange.coinbase.com"), user);
 
         scheduledExecutor.scheduleAtFixedRate(() -> {
             try {
-                test(user);
+           //    test(user);
+
+
+                List<mm> product = mmRepository.findAll();
+
+                if (product == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product not found: " + product);
+                }else {
+                    for( mm pro :product){
+                    volumeBaseOrder(user ,pro);
+                }
+                }
+
+
                 if (true) {
                     return;
                 }
@@ -80,7 +117,7 @@ public class CoinbaseTrader {
             } catch (Exception e) {
                 logger.error("send ping error: {}", e.getMessage(), e);
             }
-        }, 0, 3000, TimeUnit.MILLISECONDS);
+        }, 0, 50000, TimeUnit.MILLISECONDS);
     }
 
     @PreDestroy
@@ -93,14 +130,51 @@ public class CoinbaseTrader {
         PlaceOrderRequest order = new PlaceOrderRequest();
         order.setProductId("BTC-USDT");
         order.setClientOid(UUID.randomUUID().toString());
-        order.setPrice(BigDecimal.valueOf(new Random().nextInt(10) + 1));
+        order.setPrice(String.valueOf(BigDecimal.valueOf(new Random().nextInt(10) + 1)));
         order.setSize(String.valueOf(new Random().nextInt(10) + 1));
         order.setFunds(String.valueOf(new Random().nextInt(10) + 1));
         order.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
         order.setType("limit");
         String objectAsString = user.toString();
-     //   orderController.placeOrder(order, objectAsString);
+        orderController.placeOrder(order, objectAsString);
     }
+    public void volumeBaseOrder(User user , com.gitbitex.marketdata.entity.mm product) {
+
+        String productId = product.getBaseCurrency()+product.getQuoteCurrency();
+      //  String apiUrl = "https://api.binance.com/api/v3/avgPrice?symbol=BTCUSDT" ;
+        String apiUrl = "https://api.binance.com/api/v3/avgPrice?symbol="+productId;
+        RestTemplate restTemplate = new RestTemplate();
+        String jsonResponse = restTemplate.getForObject(apiUrl, String.class);
+        // Parse JSON response
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode jsonNode = objectMapper.readTree(jsonResponse);
+
+   //     String tradeEmitId = UUID.randomUUID().toString();
+        BigDecimal volume = BigDecimal.valueOf(tradeRepository.countTradesLast24Hours(String.valueOf(0)));
+
+        BigDecimal maxSize = product.getOrderSizeMax();
+        BigDecimal minSize = product.getOrderSizeMin();
+            BigDecimal randomPrice = new BigDecimal(jsonNode.get("price").asText());
+
+            BigDecimal randomSize = minSize
+                .add(new BigDecimal(Math.random()).multiply(maxSize.subtract(minSize))).setScale(8, RoundingMode.HALF_UP);;
+
+
+        PlaceOrderRequest orders = new PlaceOrderRequest();
+        orders.setProductId(product.getId());
+        orders.setClientOid(UUID.randomUUID().toString());
+        orders.setPrice(String.valueOf(randomPrice));
+        orders.setSize(String.valueOf(randomSize));
+        orders.setType("limit");
+        orders.setFunds(String.valueOf(new Random().nextInt(10) + 1));
+        orders.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
+
+        String objectAsString = user.toString();
+       orderController.placeOrder(orders, objectAsString);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }}
 
     @Getter
     @Setter
@@ -134,7 +208,9 @@ public class CoinbaseTrader {
         public void onOpen(ServerHandshake serverHandshake) {
             logger.info("open");
 
-            send("{\"type\":\"subscribe\",\"product_ids\":[\"BTC-USD\"],\"channels\":[\"full\"],\"token\":\"\"}");
+           send("{\"type\":\"subscribe\",\"product_ids\":[\"BTC-USD\"],\"channels\":[\"full\"],\"token\":\"\"}");
+  //       send("{\"type\":\"subscribe\",\"product_ids\":[\"BCD-USD\"],\"channels\":[\"full\"],\"token\":\"\"}");
+
         }
 
         @Override
@@ -148,18 +224,19 @@ public class CoinbaseTrader {
                     String productId = message.getProduct_id() + "T";
                     switch (message.getType()) {
                         case "received":
-                            //logger.info(JSON.toJSONString(message));
+                            logger.info(JSON.toJSONString(message));
                             if (message.getPrice() != null) {
                                 PlaceOrderRequest order = new PlaceOrderRequest();
                                 order.setProductId(productId);
                                 order.setClientOid(UUID.randomUUID().toString());
-                                order.setPrice(new BigDecimal(message.getPrice()));//new BigDecimal(String.valueOf(request.getPrice()
+                                order.setPrice(String.valueOf(new BigDecimal(message.getPrice())));//new BigDecimal(String.valueOf(request.getPrice()
                                 order.setSize(message.getSize());
                                 order.setFunds(message.getFunds());
                                 order.setSide(message.getSide().toLowerCase());
                                 order.setType("limit");
                                 String objectAsString = user.toString();
                                 orderController.placeOrder(order, objectAsString);
+
                             }
                             break;
                         case "done":

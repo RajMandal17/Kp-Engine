@@ -74,7 +74,7 @@ public class OrderPersistenceThread extends KafkaConsumerThread<String, OrderMes
         order.setStatus(message.getStatus());
         order.setPrice(message.getPrice());
         order.setSize(message.getSize());
-        order.setFunds(message.getFunds());
+        order.setFunds(String.valueOf(message.getFunds()));
         order.setClientOid(message.getClientOid());
         order.setSide(message.getSide());
         order.setType(message.getType());

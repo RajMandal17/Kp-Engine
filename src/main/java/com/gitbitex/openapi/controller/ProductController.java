@@ -4,10 +4,7 @@ import com.gitbitex.enums.OrderSide;
 import com.gitbitex.enums.OrderType;
 import com.gitbitex.enums.TimeInForce;
 import com.gitbitex.feed.message.OrderFeedMessage;
-import com.gitbitex.marketdata.entity.Candle;
-import com.gitbitex.marketdata.entity.Order;
-import com.gitbitex.marketdata.entity.Product;
-import com.gitbitex.marketdata.entity.Trade;
+import com.gitbitex.marketdata.entity.*;
 import com.gitbitex.marketdata.repository.*;
 import com.gitbitex.matchingengine.OrderBookSnapshotStore;
 import com.gitbitex.matchingengine.TradeEmit;
@@ -17,7 +14,10 @@ import com.gitbitex.matchingengine.command.PutProductCommand;
 import com.gitbitex.matchingengine.message.OrderMatchMessage;
 import com.gitbitex.matchingengine.message.OrderMessage;
 import com.gitbitex.openapi.model.*;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,11 +25,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.validation.Valid;
+import javax.validation.constraints.NotBlank;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController()
+@Slf4j
 @RequiredArgsConstructor
 public class ProductController {
     private final OrderBookSnapshotStore orderBookSnapshotStore;
@@ -39,7 +41,7 @@ public class ProductController {
     private final OrderRepository orderRepository;
     private final CandleRepository candleRepository;
     private final MatchingEngineCommandProducer producer;
-
+    private final MMRepository mmRepository;
     @GetMapping("/api/products")
     public List<ProductDto> getProducts() {
         List<Product> products = productRepository.findAll();
@@ -91,7 +93,33 @@ public class ProductController {
         }
         return tradeDtos;
     }
+/*  @PostMapping(value = "/api/products/AddMarketMaker")
+    public ResponseEntity<Map<String,String>>AddMarketMaker(@RequestBody SaveProductRequest request){
 
+
+        if (request != null) {
+            logger.info("start");
+
+            User user = adminController.createUser("test@test.com", "12345678");
+            SaveProductRequest putProductRequest = new SaveProductRequest();
+            putProductRequest.setBaseCurrency(request.getBaseCurrency());
+            putProductRequest.setQuoteCurrency(request.getQuoteCurrency());
+            adminController.saveProduct(putProductRequest);
+            }
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "200");
+            response.put("id", response.getB);
+            response.put("message", "updated successfully");
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } else {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("status", "400");
+            errorResponse.put("id", id);
+            errorResponse.put("message", "Not updated");
+            return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        }
+
+    }*/
     @PostMapping("/api/trade/{id}")
     public ResponseEntity<Map<String, String>> searchTradeByProductId(@RequestBody @Valid TradeStatus request, @PathVariable String id) {
         List<Trade> trades = tradeRepository.findByProductId(id);
@@ -115,6 +143,74 @@ public class ProductController {
         }
 
     }
+    @PostMapping("/api/products/addStableCurrency")
+    public Product saveStableCurrency(@RequestBody @Valid PutProductRequest request) {
+        String productId = request.getBaseCurrency() + "-" + request.getQuoteCurrency();
+        Product product = buildProduct(productId, request);
+        productRepository.save(product);
+
+        mm mm = buildMM(productId, request);
+        mmRepository.save(mm);
+
+        PutProductCommand putProductCommand = new PutProductCommand();
+        putProductCommand.setProductId(product.getId());
+        putProductCommand.setBaseCurrency(product.getBaseCurrency());
+        putProductCommand.setQuoteCurrency(product.getQuoteCurrency());
+        producer.send(putProductCommand, null);
+
+        return product;
+    }
+
+    @PutMapping("/api/products/updateStableCurrency")
+    public Product updateStableCurrency(@RequestBody @Valid PutProductRequest request) {
+        String productId = request.getBaseCurrency() + "-" + request.getQuoteCurrency();
+        Product product = buildProduct(productId, request);
+        productRepository.save(product);
+
+        mm mm = buildMM(productId, request);
+        mmRepository.update(mm);
+
+        PutProductCommand putProductCommand = new PutProductCommand();
+        putProductCommand.setProductId(product.getId());
+        putProductCommand.setBaseCurrency(product.getBaseCurrency());
+        putProductCommand.setQuoteCurrency(product.getQuoteCurrency());
+        producer.send(putProductCommand, null);
+
+        return product;
+    }
+
+    private Product buildProduct(String productId, PutProductRequest request) {
+        Product product = new Product();
+        product.setId(productId);
+        product.setBaseCurrency(request.getBaseCurrency());
+        product.setQuoteCurrency(request.getQuoteCurrency());
+        product.setBaseScale(request.getBaseScale());
+        product.setQuoteScale(request.getQuoteScale());
+        product.setBaseMinSize(BigDecimal.ZERO);
+        product.setBaseMaxSize(request.getBaseMaxSize());
+        product.setQuoteMinSize(BigDecimal.ZERO);
+        product.setQuoteMaxSize(request.getQuoteMaxSize());
+        return product;
+    }
+
+    private mm buildMM(String productId, PutProductRequest request) {
+        mm mm = new mm();
+        mm.setId(productId);
+        mm.setBaseCurrency(request.baseCurrency);
+        mm.setQuoteCurrency(request.quoteCurrency);
+        mm.setBaseScale(6);
+        mm.setQuoteScale(2);
+        mm.setBaseMinSize(BigDecimal.ZERO);
+        mm.setBaseMaxSize(new BigDecimal("100000000"));
+        mm.setQuoteMinSize(BigDecimal.ZERO);
+        mm.setQuoteMaxSize(new BigDecimal("10000000000"));
+        mm.setProductId(request.productId);
+        mm.setOrderSizeMax(request.orderSizeMax);
+        mm.setOrderSizeMin(request.orderSizeMin);
+
+        mm.setSpread(request.Spread);
+        return mm;
+    }
 
 
     @GetMapping("/api/trade")
@@ -136,37 +232,46 @@ public class ProductController {
         List<TradeEmit> trades = tradeEmitRepository.findAllTrade("0", 50);
         List<TradeEmitDto> tradeEmitDtos = new ArrayList<>();
         for (TradeEmit trade : trades) {
-            // Uncomment the condition if you want to filter trades based on status
-            // if (!StringUtils.isBlank(trade.getStatus())) {
+
             tradeEmitDtos.add(tradeEmits(trade));
-            // }
+
         }
         return tradeEmitDtos;
     }
 
-    @PostMapping("/api/tradeEmit/{id}")
-    public ResponseEntity<Map<String, String>> searchTradeEmitByProductId(@RequestBody @Valid TradeEmit request, @PathVariable String id) {
-        List<TradeEmit> trades = tradeEmitRepository.findByProductId(id);
+    @PostMapping("/api/tradeEmit/{tradeEmitId}")
+    public ResponseEntity<Map<String, String>> searchTradeEmitByProductId(@RequestBody @Valid TradeStatus request, @PathVariable String tradeEmitId) {
+        List<TradeEmit> trades = tradeEmitRepository.findByProductId(tradeEmitId);
 
         if (!trades.isEmpty()) {
             for (TradeEmit tradeEmit : trades) {
-                tradeEmit.setStatus(request.getStatus());
-                tradeEmitRepository.save(tradeEmit);
+                if(!tradeEmit.getStatus().equals("0")){
+                    Map<String, String> response = new HashMap<>();
+                    response.put("status", "400");
+                    response.put("id", tradeEmitId);
+                    response.put("message", "Status already updated ");
+                    return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+                } else {
+                    tradeEmit.setStatus(request.getStatus());
+                    tradeEmitRepository.updateStatusByTradeEmitId(tradeEmitId, "1");
+                }
             }
             Map<String, String> response = new HashMap<>();
             response.put("status", "200");
-            response.put("id", id);
+            response.put("id", tradeEmitId);
             response.put("message", "updated successfully");
             return new ResponseEntity<>(response, HttpStatus.OK);
         } else {
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("status", "400");
-            errorResponse.put("id", id);
+            errorResponse.put("id", tradeEmitId);
             errorResponse.put("message", "Not updated");
             return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
         }
-
     }
+
+
+
 
 
     @GetMapping("/api/trade/{orderId}")
@@ -219,6 +324,8 @@ public class ProductController {
             default -> null;
         };
     }
+
+
 
     private ProductDto productDto(Product product) {
         ProductDto productDto = new ProductDto();
@@ -311,9 +418,10 @@ public class ProductController {
     private TradeEmitDto tradeEmits(TradeEmit trade) {
         TradeEmitDto tradeEmitDto = new TradeEmitDto();
         tradeEmitDto.setProductId(trade.getProductId());
+        tradeEmitDto.setTradeEmitId(String.valueOf(trade.getTradeEmitId()));
         tradeEmitDto.setTakerOrderId(trade.getTakerOrderId());
         tradeEmitDto.setMakerOrderId(trade.getMakerOrderId());
-        tradeEmitDto.setStatus(trade.getStatus());
+     //   tradeEmitDto.setStatus(trade.getStatus());
         tradeEmitDto.setSequence(trade.getSequence());
         tradeEmitDto.setTime(trade.getTime());
         tradeEmitDto.setPrice(trade.getPrice());
@@ -343,7 +451,27 @@ public class ProductController {
         return tradeEmitDto;
     }
 
+    @Getter
+    @Setter
+    public static class PutProductRequest {
+        @NotBlank
+        private String baseCurrency;
+        @NotBlank
+        private String quoteCurrency;
 
+        private BigDecimal baseMaxSize;
+
+        private BigDecimal quoteMaxSize;
+        private int baseScale;
+        private int quoteScale;
+        private float quoteIncrement;
+
+        private String productId;
+
+        private BigDecimal orderSizeMin;
+        private BigDecimal orderSizeMax;
+        private BigDecimal Spread;
+    }
 }
 
 

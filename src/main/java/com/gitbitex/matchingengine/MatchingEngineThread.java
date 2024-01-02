@@ -1,5 +1,6 @@
 package com.gitbitex.matchingengine;
 
+import com.alibaba.fastjson.JSON;
 import com.gitbitex.AppProperties;
 import com.gitbitex.matchingengine.command.*;
 import com.gitbitex.middleware.kafka.KafkaConsumerThread;
@@ -18,6 +19,7 @@ import java.util.List;
 public class MatchingEngineThread extends KafkaConsumerThread<String, Command>
         implements CommandHandler, ConsumerRebalanceListener {
     private final AppProperties appProperties;
+
     private final EngineSnapshotStore engineSnapshotStore;
     private final List<EngineListener> engineListeners;
     private MatchingEngine matchingEngine;
@@ -63,13 +65,13 @@ public class MatchingEngineThread extends KafkaConsumerThread<String, Command>
         records.forEach(x -> {
             Command command = x.value();
             command.setOffset(x.offset());
-            //logger.info("{}", JSON.toJSONString(command));
+            logger.info("{}", JSON.toJSONString(command));
             CommandDispatcher.dispatch(command, this);
-            /*try {
+            try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
-            }*/
+            }
         });
     }
 

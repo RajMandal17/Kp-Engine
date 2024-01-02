@@ -51,13 +51,13 @@ public class OrderBook {
 
         takerOrder.setSequence(++orderSequence);
 
-//        if (takerOrder.getSide() == OrderSide.BUY) {
-//            accountBook.hold(takerOrder.getUserId(), product.getQuoteCurrency(), takerOrder.getRemainingFunds(),
-//                    modifiedObjects);
-//        } else {
-//            accountBook.hold(takerOrder.getUserId(), product.getBaseCurrency(), takerOrder.getRemainingSize(),
-//                    modifiedObjects);
-//        }
+        if (takerOrder.getSide() == OrderSide.BUY) {
+            accountBook.hold(takerOrder.getUserId(), product.getQuoteCurrency(), takerOrder.getRemainingFunds(),
+                    modifiedObjects);
+        } else {
+            accountBook.hold(takerOrder.getUserId(), product.getBaseCurrency(), takerOrder.getRemainingSize(),
+                    modifiedObjects);
+        }
 //        if (modifiedObjects.isEmpty()) {
 //            logger.warn("order rejected, reason: INSUFFICIENT_FUNDS: {}", JSON.toJSONString(takerOrder));
 //            takerOrder.setStatus(OrderStatus.REJECTED);
@@ -217,9 +217,9 @@ public class OrderBook {
             return true;
         }
         if (takerOrder.getSide() == OrderSide.BUY) {
-            return takerOrder.getPrice().compareTo(makerOrderPrice) >= 0;
+            return takerOrder.getPrice().compareTo(makerOrderPrice) >= 100;
         } else {
-            return takerOrder.getPrice().compareTo(makerOrderPrice) <= 0;
+            return takerOrder.getPrice().compareTo(makerOrderPrice) <= 100;
         }
     }
 

@@ -2,9 +2,9 @@ package com.gitbitex.kafka;
 
 import com.alibaba.fastjson.JSON;
 import com.gitbitex.AppProperties;
+import com.gitbitex.marketdata.entity.Order;
 import com.gitbitex.marketdata.entity.Trade;
 import com.gitbitex.matchingengine.Account;
-import com.gitbitex.matchingengine.Order;
 import com.gitbitex.matchingengine.TradeEmit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.Callback;
@@ -22,6 +22,15 @@ public class KafkaMessageProducer extends KafkaProducer<String, String> {
         this.appProperties = appProperties;
     }
 
+    public void sendOrder(Order order, Callback callback) {
+        send(new ProducerRecord<>(appProperties.getOrderMessageTopic(), order.getId(),
+                JSON.toJSONString(order)), (m, e) -> {
+            if (e != null) {
+                throw new RuntimeException(e);
+            }
+            callback.onCompletion(m, null);
+        });
+    }
 
     public void sendAccount(Account account, Callback callback) {
         send(new ProducerRecord<>(appProperties.getAccountMessageTopic(), account.getUserId(),
@@ -52,14 +61,6 @@ public class KafkaMessageProducer extends KafkaProducer<String, String> {
         });
     }
 
-    public void sendOrder(Order order, Callback callback) {
-        send(new ProducerRecord<>(appProperties.getOrderMessageTopic(), order.getId(),
-                JSON.toJSONString(order)), (m, e) -> {
-            if (e != null) {
-                throw new RuntimeException(e);
-            }
-            callback.onCompletion(m, null);
-        });
-    }
+
 
 }

@@ -20,7 +20,7 @@ public class PlaceOrderRequest {
 
     private String funds;
 
-    private BigDecimal price;
+    private String price;
 
     private String last_trade_id;
     @NotBlank
@@ -32,4 +32,8 @@ public class PlaceOrderRequest {
      * [optional] GTC, GTT, IOC, or FOK (default is GTC)
      */
     private String TimeInForce;
+    private BigDecimal minPrice;
+    private BigDecimal maxPrice;
+    private BigDecimal orderSizeMin;
+    private BigDecimal orderSizeMax;
 }

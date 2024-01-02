@@ -21,7 +21,7 @@ public class Order {
     private String clientOid;
     private Date time;
     private BigDecimal size;
-    private BigDecimal funds;
+    private String funds;
     private BigDecimal filledSize;
     private BigDecimal executedValue;
     private BigDecimal price;

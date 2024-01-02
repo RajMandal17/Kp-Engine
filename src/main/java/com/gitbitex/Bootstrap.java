@@ -6,9 +6,7 @@ import com.gitbitex.marketdata.manager.AccountManager;
 import com.gitbitex.marketdata.manager.OrderManager;
 import com.gitbitex.marketdata.manager.ProductManager;
 import com.gitbitex.marketdata.manager.TickerManager;
-import com.gitbitex.marketdata.repository.CandleRepository;
-import com.gitbitex.marketdata.repository.ProductRepository;
-import com.gitbitex.marketdata.repository.TradeRepository;
+import com.gitbitex.marketdata.repository.*;
 import com.gitbitex.matchingengine.*;
 import com.gitbitex.matchingengine.command.CommandDeserializer;
 import com.gitbitex.matchingengine.message.AccountMessageDeserializer;
@@ -40,6 +38,7 @@ public class Bootstrap {
     private final CandleRepository candleRepository;
     private final KafkaMessageProducer messageProducer;
     private final TickerManager tickerManager;
+
     private final AppProperties appProperties;
     private final KafkaProperties kafkaProperties;
     private final RedissonClient redissonClient;
@@ -49,6 +48,10 @@ public class Bootstrap {
     private final EngineSnapshotTaker engineSnapshotTaker;
     private final OrderBookSnapshotTaker orderBookSnapshotTaker;
     private final List<EngineListener> engineListeners;
+    private final KafkaMessageProducer producer;
+    private final TradeEmitRepository tradeEmitRepository;
+    private final OrderRepository orderRepository;
+
 
     @PostConstruct
     public void init() {
@@ -90,7 +93,8 @@ public class Bootstrap {
                     engineListeners, appProperties);
             matchingEngineThread.setName(groupId + "-" + matchingEngineThread.getId());
             matchingEngineThread.start();
-            threads.add(matchingEngineThread);
+        //    new ModifiedObjectWriter( producer,  redissonClient,  tradeEmitRepository,  tradeRepository,  orderRepository);
+                threads.add(matchingEngineThread);
         }
     }
 

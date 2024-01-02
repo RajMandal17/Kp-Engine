@@ -5,5 +5,6 @@ public enum OrderStatus {
     RECEIVED,
     OPEN,
     CANCELLED,
-    FILLED,
+    FILLED
+
 }

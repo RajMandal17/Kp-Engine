@@ -2,9 +2,13 @@ package com.gitbitex.marketdata.repository;
 
 import com.gitbitex.marketdata.entity.Trade;
 import com.gitbitex.matchingengine.TradeEmit;
+import com.mongodb.MongoException;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.UpdateResult;
+import com.mongodb.diagnostics.logging.Logger;
+import lombok.extern.flogger.Flogger;
 import org.bson.conversions.Bson;
 import org.springframework.stereotype.Component;
 
@@ -38,8 +42,8 @@ public class TradeEmitRepository {
                 .into(new ArrayList<>());
     }
 
-    public List<TradeEmit> findByProductId(String id) {
-        return this.collection.find(Filters.eq("_id", id))
+    public List<TradeEmit> findByProductId(String tradeEmitId) {
+        return this.collection.find(Filters.eq("tradeEmitId", tradeEmitId))
                 .sort(Sorts.descending("sequence"))
                 .into(new ArrayList<>());
     }
@@ -48,7 +52,7 @@ public class TradeEmitRepository {
         Bson filter = Filters.eq("status", status);
         return this.collection.find(filter)
                 .sort(Sorts.descending("sequence"))
-                .limit(limit)
+          //      .limit(limit)
                 .into(new ArrayList<>());
     }
     public List<TradeEmit> findTradeByOrderId(String orderId, int limit) {
@@ -89,4 +93,21 @@ public class TradeEmitRepository {
     }
 
 
+    public void updateStatusByTradeEmitId(String tradeEmitId, String newStatus) {
+        try {
+            Bson filter = Filters.eq("tradeEmitId", tradeEmitId);
+            Bson update = Updates.set("status", newStatus);
+            UpdateOptions options = new UpdateOptions().upsert(false);
+
+            UpdateResult result = collection.updateOne(filter, update, options);
+
+            if (result.getModifiedCount() == 0) {
+
+
+            }
+        } catch (MongoException e) {
+
+            e.printStackTrace();
+        }
+    }
 }

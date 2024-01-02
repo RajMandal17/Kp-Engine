@@ -3,9 +3,9 @@ package com.gitbitex.matchingengine;
 import com.alibaba.fastjson.JSON;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gitbitex.kafka.KafkaMessageProducer;
 import com.gitbitex.marketdata.entity.Trade;
+import com.gitbitex.marketdata.repository.OrderRepository;
 import com.gitbitex.marketdata.repository.TradeEmitRepository;
 import com.gitbitex.marketdata.repository.TradeRepository;
 import com.gitbitex.matchingengine.command.Command;
@@ -21,12 +21,10 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PreDestroy;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -50,6 +48,7 @@ public class ModifiedObjectWriter implements EngineListener {
     private final RTopic accountTopic;
     private final TradeEmitRepository tradeEmitRepository;
     private  final TradeRepository tradeRepository;
+    private final OrderRepository orderRepository;
     private final RTopic orderTopic;
     private final RTopic orderBookMessageTopic;
     private final ConcurrentLinkedQueue<ModifiedObjectList> modifiedObjectsQueue = new ConcurrentLinkedQueue<>();
@@ -58,13 +57,14 @@ public class ModifiedObjectWriter implements EngineListener {
     private final StripedExecutorService redisExecutor = new StripedExecutorService(Runtime.getRuntime().availableProcessors());
     private long lastCommandOffset;
 
-    public ModifiedObjectWriter(KafkaMessageProducer producer, RedissonClient redissonClient, TradeEmitRepository tradeEmitRepository, TradeRepository tradeRepository) {
+    public ModifiedObjectWriter(KafkaMessageProducer producer, RedissonClient redissonClient, TradeEmitRepository tradeEmitRepository, TradeRepository tradeRepository, OrderRepository orderRepository) {
         this.producer = producer;
         this.accountTopic = redissonClient.getTopic("account", StringCodec.INSTANCE);
         this.orderTopic = redissonClient.getTopic("order", StringCodec.INSTANCE);
         this.orderBookMessageTopic = redissonClient.getTopic("orderBookLog", StringCodec.INSTANCE);
         this.tradeEmitRepository = tradeEmitRepository;
         this.tradeRepository = tradeRepository;
+        this.orderRepository = orderRepository;
         startMainTask();
     }
 
@@ -88,8 +88,8 @@ public class ModifiedObjectWriter implements EngineListener {
     private void save(ModifiedObjectList modifiedObjects) {
         modifiedObjectCreatedCounter.increment(modifiedObjects.size());
         modifiedObjects.forEach(obj -> {
-            if (obj instanceof Order) {
-                save(modifiedObjects.getSavedCounter(), (Order) obj);
+            if (obj instanceof com.gitbitex.marketdata.entity.Order) {
+                save(modifiedObjects.getSavedCounter(), (com.gitbitex.marketdata.entity.Order) obj);
             } else if (obj instanceof Account) {
                 save(modifiedObjects.getSavedCounter(), (Account) obj);
             } else if (obj instanceof Trade) {
@@ -116,7 +116,7 @@ public class ModifiedObjectWriter implements EngineListener {
         });
     }
 
-    private void save(AtomicLong savedCounter, Order order) {
+    private void save(AtomicLong savedCounter, com.gitbitex.marketdata.entity.Order order) {
         String productId = order.getProductId();
         kafkaExecutor.execute(productId, () -> {
             String data = JSON.toJSONString(order);
@@ -126,9 +126,12 @@ public class ModifiedObjectWriter implements EngineListener {
             });
             redisExecutor.execute(order.getUserId(), () -> {
                 orderTopic.publishAsync(data);
+                orderRepository.save(order);
             });
         });
     }
+
+
     private void save(AtomicLong savedCounter, Trade trade) {
         kafkaExecutor.execute(trade.getProductId(), () -> {
             try {
@@ -166,6 +169,7 @@ public class ModifiedObjectWriter implements EngineListener {
                     logger.warn("API not reachable. Saving to both repositories.");
                     tradeRepository.save(trade);
                     tradeEmitRepository.save(TradeEmitDto(trade));
+
                     logger.info("Trade saved to tradeEmitRepository: {}", trade);
                 }
             } catch (HttpClientErrorException e) {
@@ -197,6 +201,7 @@ public class ModifiedObjectWriter implements EngineListener {
     private TradeEmit TradeEmitDto(Trade trade) {
 
         TradeEmit tradeEmit = new TradeEmit();
+        tradeEmit.setTradeEmitId(UUID.randomUUID().toString());
         tradeEmit.setProductId(trade.getProductId());
         tradeEmit.setSize(trade.getSize());
         tradeEmit.setPrice(trade.getPrice());
@@ -207,7 +212,7 @@ public class ModifiedObjectWriter implements EngineListener {
         tradeEmit.setStatus("0");
         tradeEmit.setMakerOrderId(trade.getMakerOrderId());
         tradeEmit.setTakerOrderId(trade.getTakerOrderId());
-   //     tradeEmitRepository.save(tradeEmit);
+
 
        return tradeEmit;
     }

@@ -2,9 +2,11 @@ package com.gitbitex.openapi.controller;
 
 import com.gitbitex.marketdata.entity.Product;
 import com.gitbitex.marketdata.entity.User;
+import com.gitbitex.marketdata.entity.mm;
 import com.gitbitex.marketdata.manager.AccountManager;
 import com.gitbitex.marketdata.manager.UserManager;
 import com.gitbitex.marketdata.repository.ProductRepository;
+import com.gitbitex.marketdata.repository.MMRepository;
 import com.gitbitex.matchingengine.command.CancelOrderCommand;
 import com.gitbitex.matchingengine.command.DepositCommand;
 import com.gitbitex.matchingengine.command.MatchingEngineCommandProducer;
@@ -30,6 +32,9 @@ public class AdminController {
     private final MatchingEngineCommandProducer producer;
     private final AccountManager accountManager;
     private final ProductRepository productRepository;
+
+    private final MMRepository mmRepository;
+
     private final UserManager userManager;
 
     @GetMapping("/api/admin/createUser")
@@ -52,7 +57,7 @@ public class AdminController {
         return "ok";
     }
 
-    @PutMapping("/api/admin/products")
+    @PostMapping("/api/admin/products")
     public Product saveProduct(@RequestBody @Valid PutProductRequest request) {
         String productId = request.getBaseCurrency() + "-" + request.getQuoteCurrency();
         Product product = new Product();
@@ -66,6 +71,18 @@ public class AdminController {
         product.setQuoteMinSize(BigDecimal.ZERO);
         product.setQuoteMaxSize(new BigDecimal("10000000000"));
         productRepository.save(product);
+        mm mm= new mm();
+        mm.setId(productId);
+        mm.setBaseCurrency(request.baseCurrency);
+        mm.setQuoteCurrency(request.quoteCurrency);
+        mm.setBaseScale(6);
+        mm.setQuoteScale(2);
+        mm.setBaseMinSize(BigDecimal.ZERO);
+        mm.setBaseMaxSize(new BigDecimal("100000000"));
+        mm.setQuoteMinSize(BigDecimal.ZERO);
+        mm.setQuoteMaxSize(new BigDecimal("10000000000"));
+
+        mmRepository.save(mm);
 
         PutProductCommand putProductCommand = new PutProductCommand();
         putProductCommand.setProductId(product.getId());

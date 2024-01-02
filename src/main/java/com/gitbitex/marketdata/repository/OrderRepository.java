@@ -3,6 +3,8 @@ package com.gitbitex.marketdata.repository;
 import com.gitbitex.enums.OrderSide;
 import com.gitbitex.enums.OrderStatus;
 import com.gitbitex.marketdata.entity.Order;
+import com.gitbitex.marketdata.entity.Trade;
+import com.gitbitex.matchingengine.command.PlaceOrderCommand;
 import com.gitbitex.openapi.model.PagedList;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -15,7 +17,16 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.ReplaceOneModel;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Accumulators;
 
 @Component
 public class OrderRepository {
@@ -33,6 +44,25 @@ public class OrderRepository {
         return this.collection
                 .find(Filters.eq("_id", orderId))
                 .first();
+    }
+
+    public void save(Order order) {
+        // Find the maximum sequence value in the collection
+        Bson maxSequenceFilter = Aggregates.group(null, Accumulators.max("maxSequence", "$sequence"));
+        Document maxSequenceResult = collection.aggregate(Collections.singletonList(maxSequenceFilter), Document.class).first();
+
+        long nextSequence = 1L; // Default value if no orders exist yet
+
+        if (maxSequenceResult != null) {
+            // If there are orders, get the max sequence and increment it for the new order
+            nextSequence = maxSequenceResult.getLong("maxSequence") + 1;
+        }
+
+        // Set the sequence for the new order
+        order.setSequence(nextSequence);
+
+        // Save the order to the collection
+        collection.replaceOne(Filters.eq("_id", order.getId()), order, new ReplaceOptions().upsert(true));
     }
 
     public UpdateResult updateOrderStatus(String orderId, OrderStatus newStatus) {

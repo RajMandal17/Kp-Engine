@@ -52,7 +52,7 @@ public class MatchingEngine {
         commandProcessedCounter.increment();
         OrderBook orderBook = orderBooks.get(command.getProductId());
         if (orderBook == null) {
-            logger.warn("no such order book: {}", command.getProductId());
+            logger.warn("no such order book PlaceOrderCommand: {}", command.getProductId());
             return;
         }
         ModifiedObjectList modifiedObjects = new ModifiedObjectList(command.getOffset(), command.getProductId());
