@@ -35,7 +35,7 @@ public class MMRepository {
         this.mongoCollection.bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
 
     }
-    public void update(mm product)  {
+    public void update(mm product) {
         List<WriteModel<mm>> writeModels = new ArrayList<>();
 
         // Set the filter to find the document by its ID
@@ -54,10 +54,14 @@ public class MMRepository {
                 Updates.set("quoteScale", product.getQuoteScale()),
                 Updates.set("quoteIncrement", product.getQuoteIncrement()),
 
+                Updates.set("maxPriceRatio", product.getMaxPriceRatio()),
+                Updates.set("minPriceRatio", product.getMinPriceRatio()),
                 Updates.set("orderSizeMin", product.getOrderSizeMin()),
                 Updates.set("orderSizeMax", product.getOrderSizeMax()),
-                Updates.set("spread", product.getSpread())
+                Updates.set("spread", product.getSpread()),
+                Updates.set("mmPriceCronTime", product.getMmPriceCronTime())
         );
+
         // Create an UpdateOneModel with the specified filter, update, and options
         UpdateOneModel<mm> updateModel = new UpdateOneModel<>(filter, update, new UpdateOptions().upsert(true));
 
@@ -67,4 +71,5 @@ public class MMRepository {
         // Execute the bulk write operation
         this.mongoCollection.bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
     }
+
 }

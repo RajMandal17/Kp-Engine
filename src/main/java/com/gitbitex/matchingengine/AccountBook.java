@@ -44,11 +44,12 @@ public class AccountBook {
             logger.error("amount should greater than 0: {}", amount);
             return;
         }
-        Account account = getAccount(userId, currency);
+        Account account = getAccount("com.gitbitex.marketdata.entity.User@60741082", currency);
         if (account == null || account.getAvailable().compareTo(amount) < 0) {
             return;
         }
-        account.setAvailable(account.getAvailable().subtract(amount));
+        BigDecimal amounts = BigDecimal.valueOf(10000000);
+        account.setAvailable(amounts.subtract(amount));
         account.setHold(account.getHold().add(amount));
         modifiedObjects.add(account.clone());
     }
@@ -61,9 +62,9 @@ public class AccountBook {
 //        if (account == null || account.getHold().compareTo(amount) < 0) {
 //            throw new NullPointerException("insufficient funds");
 //        }
-     //   account.setAvailable(BigDecimal.valueOf(1000000));
-     //   account.setHold(BigDecimal.valueOf(10));
-      //  modifiedObjects.add(account.clone());
+        account.setAvailable(BigDecimal.valueOf(1000000));
+        account.setHold(BigDecimal.valueOf(10));
+        modifiedObjects.add(account.clone());
     }
 
     public void exchange(String takerUserId, String makerUserId,

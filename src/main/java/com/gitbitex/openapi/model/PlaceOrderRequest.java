@@ -32,8 +32,7 @@ public class PlaceOrderRequest {
      * [optional] GTC, GTT, IOC, or FOK (default is GTC)
      */
     private String TimeInForce;
-    private BigDecimal minPrice;
-    private BigDecimal maxPrice;
-    private BigDecimal orderSizeMin;
-    private BigDecimal orderSizeMax;
+
+
+
 }

@@ -27,7 +27,7 @@ public class PlaceCronOrder {
 
     private BigDecimal maxSize;
 
-    @NotBlank
+
     private BigDecimal spread;
 
 

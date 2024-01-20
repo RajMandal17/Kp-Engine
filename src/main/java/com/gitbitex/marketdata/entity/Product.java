@@ -21,6 +21,7 @@ public class Product {
     private int baseScale;
     private int quoteScale;
     private float quoteIncrement;
+    private BigDecimal Spread;
 
 
 

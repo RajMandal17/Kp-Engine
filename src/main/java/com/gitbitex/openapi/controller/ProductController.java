@@ -190,6 +190,7 @@ public class ProductController {
         product.setBaseMaxSize(request.getBaseMaxSize());
         product.setQuoteMinSize(BigDecimal.ZERO);
         product.setQuoteMaxSize(request.getQuoteMaxSize());
+        product.setSpread(request.getSpread());
         return product;
     }
 
@@ -207,7 +208,8 @@ public class ProductController {
         mm.setProductId(request.productId);
         mm.setOrderSizeMax(request.orderSizeMax);
         mm.setOrderSizeMin(request.orderSizeMin);
-
+        mm.setMaxPriceRatio(request.maxPriceRatio);
+        mm.setMinPriceRatio(request.minPriceRatio);
         mm.setSpread(request.Spread);
         return mm;
     }
@@ -467,7 +469,8 @@ public class ProductController {
         private float quoteIncrement;
 
         private String productId;
-
+        private BigDecimal maxPriceRatio;
+        private BigDecimal minPriceRatio;
         private BigDecimal orderSizeMin;
         private BigDecimal orderSizeMax;
         private BigDecimal Spread;

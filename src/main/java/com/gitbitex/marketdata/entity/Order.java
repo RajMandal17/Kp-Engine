@@ -29,6 +29,7 @@ public class Order {
     private OrderType type;
     private OrderSide side;
     private OrderStatus status;
+    private String role;
     /**
      * Time in force policies provide guarantees about the lifetime of an order. There are four policies: good till
      * canceled GTC, good till time GTT, immediate or cancel IOC, and fill or kill FOK.

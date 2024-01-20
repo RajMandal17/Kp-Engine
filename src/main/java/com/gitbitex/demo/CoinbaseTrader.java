@@ -3,16 +3,13 @@ package com.gitbitex.demo;
 import com.alibaba.fastjson.JSON;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gitbitex.AppProperties;
-import com.gitbitex.marketdata.entity.Product;
 import com.gitbitex.marketdata.entity.User;
 import com.gitbitex.marketdata.entity.mm;
+import com.gitbitex.marketdata.entity.mmPrice;
 import com.gitbitex.marketdata.repository.MMRepository;
-import com.gitbitex.marketdata.repository.ProductRepository;
+import com.gitbitex.marketdata.repository.*;
 import com.gitbitex.marketdata.repository.TradeRepository;
-import com.gitbitex.matchingengine.PlaceCronOrder;
 import com.gitbitex.openapi.controller.AdminController;
-import com.gitbitex.openapi.controller.AdminController.PutProductRequest;
 import com.gitbitex.openapi.controller.OrderController;
 import com.gitbitex.openapi.model.PlaceOrderRequest;
 import com.google.common.util.concurrent.RateLimiter;
@@ -20,6 +17,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.enums.ReadyState;
 import org.java_websocket.handshake.ServerHandshake;
@@ -27,13 +25,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
-import com.gitbitex.*;
+
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.sql.Date;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -41,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 @Slf4j
@@ -48,51 +50,89 @@ import java.util.concurrent.TimeUnit;
 public class CoinbaseTrader {
     private static final RateLimiter rateLimiter = RateLimiter.create(10);
     private final OrderController orderController;
-    private final ProductRepository productRepository;
     private final MMRepository mmRepository;
     private final ExecutorService executor = Executors.newFixedThreadPool(1);
-    private final ScheduledExecutorService scheduledExecutor = Executors.newScheduledThreadPool(1);
-    private final AppProperties appProperties;
+    private  ScheduledExecutorService scheduledExecutor = Executors.newScheduledThreadPool(1);
+
     private final AdminController adminController;
     private final TradeRepository tradeRepository;
+    private final MmPriceRepository mmPriceRepository;
+
+    private final Object lock = new Object();  // Use an object for synchronization
+    private long cronTimeInSeconds;
+    private volatile boolean initRunning = false;
+
+    private MyClient client = null;
 
     @PostConstruct
-    public void init() throws URISyntaxException {
-        logger.info("start");
-
-        User user = adminController.createUser("test@test.com", "12345678");
-//        PutProductRequest putProductRequest = new PutProductRequest();
-//        putProductRequest.setBaseCurrency("BTC");
-//        putProductRequest.setQuoteCurrency("USDT");
-//        adminController.saveProduct(putProductRequest);
-//        adminController.deposit(user.getId(), "BTC", "100000000000");
-//        adminController.deposit(user.getId(), "USDT", "100000000000");
-
-//        putProductRequest.setBaseCurrency("BCD");
-//        putProductRequest.setQuoteCurrency("USDT");
-//        adminController.saveProduct(putProductRequest);
-//        adminController.deposit(user.getId(), "BCD", "100000000000");
-//        adminController.deposit(user.getId(), "USDT", "100000000000");
-
-
-
-        MyClient client = new MyClient(new URI("wss://ws-feed.exchange.coinbase.com"), user);
+    public void init() {
+        logger.info("start 2nd cron");
 
         scheduledExecutor.scheduleAtFixedRate(() -> {
             try {
-           //    test(user);
+                synchronized (lock) {
+                    try {
+                        List<mm> product = mmRepository.findAll();
+                        if (product.isEmpty()) {
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Products not found");
+                        } else {
+                            for (mm pro : product) {
+                                String productId = pro.getBaseCurrency() + pro.getQuoteCurrency();
+                                String apiUrl = "http://65.20.85.175/api/binance_ticker?symbol=" + productId;
+                                RestTemplate restTemplate = new RestTemplate();
+                                String jsonResponse = restTemplate.getForObject(apiUrl, String.class);
+
+                                try {
+                                    ObjectMapper objectMapper = new ObjectMapper();
+                                    JsonNode jsonNode = objectMapper.readTree(jsonResponse);
+                                    BigDecimal randomPrice = new BigDecimal(jsonNode.get("price").asText());
+
+                                    mmPrice mmPrice = new mmPrice();
+                                    mmPrice.setRandomPrice(randomPrice);
+                                    mmPrice.setProductId(pro.getId());
+                                    mmPrice.setTimeInForce();
+                                    mmPriceRepository.updateRandomPrice(mmPrice.getProductId(), mmPrice.getRandomPrice());
+                                } catch (Exception e) {
+                                    logger.error("Scheduled task inner error: {}", e.getMessage(), e);
+                                }
+                            }
+                        }
+                    } catch (Exception ex) {
+                        logger.error("Scheduled task outer error: {}", ex.getMessage(), ex);
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Scheduled task error: {}", e.getMessage(), e);
+            }
+        }, 0, 300, TimeUnit.SECONDS);
+    }
 
 
+
+
+
+    public void initWithUser() {
+        logger.info("Running order cron");
+
+        User user = adminController.createUser("test@test.com", "12345678");
+
+        try {
+            client = new MyClient(new URI("wss://ws-feed.exchange.coinbase.com"), user);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+
+        try {
+            synchronized (lock) {
                 List<mm> product = mmRepository.findAll();
 
                 if (product == null) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product not found: " + product);
-                }else {
-                    for( mm pro :product){
-                    volumeBaseOrder(user ,pro);
+                } else {
+                    for (mm pro : product) {
+                        volumeBaseOrder(user, pro);
+                    }
                 }
-                }
-
 
                 if (true) {
                     return;
@@ -114,11 +154,55 @@ public class CoinbaseTrader {
                 } else {
                     client.sendPing();
                 }
-            } catch (Exception e) {
-                logger.error("send ping error: {}", e.getMessage(), e);
             }
-        }, 0, 50000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            logger.error("Error in scheduled task: {}", e.getMessage(), e);
+        }
     }
+
+
+    public void startInit(long id) {
+        synchronized (lock) {
+            if (!initRunning) {
+                initRunning = true;
+
+                // Recreate the ScheduledExecutorService if it was shut down
+                if (scheduledExecutor.isShutdown() || scheduledExecutor.isTerminated()) {
+                    scheduledExecutor = Executors.newScheduledThreadPool(1);
+                }
+
+                scheduledExecutor.scheduleAtFixedRate(this::initWithUser, 0, id, TimeUnit.SECONDS);
+                logger.info("Initialization started");
+            } else {
+                logger.warn("Initialization is already running");
+            }
+        }
+    }
+
+    public void stopInit() {
+        synchronized (lock) {
+            if (initRunning) {
+                initRunning = false;
+                scheduledExecutor.shutdown();
+                try {
+                    if (!scheduledExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                        scheduledExecutor.shutdownNow();
+                        if (!scheduledExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                            logger.error("Scheduler did not terminate");
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    scheduledExecutor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+                logger.info("Initialization stopped");
+            } else {
+                logger.warn("Initialization is not running");
+            }
+        }
+    }
+
+
 
     @PreDestroy
     public void destroy() {
@@ -136,42 +220,48 @@ public class CoinbaseTrader {
         order.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
         order.setType("limit");
         String objectAsString = user.toString();
-        orderController.placeOrder(order, objectAsString);
+        //      orderController.placeOrder(order, objectAsString);
     }
-    public void volumeBaseOrder(User user , com.gitbitex.marketdata.entity.mm product) {
-
-        String productId = product.getBaseCurrency()+product.getQuoteCurrency();
-      //  String apiUrl = "https://api.binance.com/api/v3/avgPrice?symbol=BTCUSDT" ;
-        String apiUrl = "https://api.binance.com/api/v3/avgPrice?symbol="+productId;
-        RestTemplate restTemplate = new RestTemplate();
-        String jsonResponse = restTemplate.getForObject(apiUrl, String.class);
-        // Parse JSON response
+    public void volumeBaseOrder(User user , mm product) {
+        BigDecimal randomPrice = null;
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode jsonNode = objectMapper.readTree(jsonResponse);
+            mmPrice mmPriceList = mmPriceRepository.findById(product.getId());
+            int currentMinute=LocalDateTime.now().getMinute();
+            //    for (mmPrice mmPrice : mmPriceList) {
+            if (mmPriceList.getTimeInForce() != null  ) {
+                randomPrice = mmPriceList.getRandomPrice();
 
-   //     String tradeEmitId = UUID.randomUUID().toString();
-        BigDecimal volume = BigDecimal.valueOf(tradeRepository.countTradesLast24Hours(String.valueOf(0)));
+            } else {
 
-        BigDecimal maxSize = product.getOrderSizeMax();
-        BigDecimal minSize = product.getOrderSizeMin();
-            BigDecimal randomPrice = new BigDecimal(jsonNode.get("price").asText());
+                System.out.println("Skipped mmPrice take hardcoded price: " + mmPriceList.toString());
+            }
+            //}
 
+            BigDecimal volume = BigDecimal.valueOf(tradeRepository.countTradesLast24Hours(String.valueOf(0)));
+            BigDecimal maxSize = product.getOrderSizeMax();
+            BigDecimal minSize = product.getOrderSizeMin();
+            BigDecimal maxPrice = product.getMaxPriceRatio();
+            BigDecimal minPrice = product.getMinPriceRatio();
             BigDecimal randomSize = minSize
-                .add(new BigDecimal(Math.random()).multiply(maxSize.subtract(minSize))).setScale(8, RoundingMode.HALF_UP);;
+                    .add(new BigDecimal(Math.random()).multiply(maxSize.subtract(minSize))).setScale(8, RoundingMode.HALF_UP);;
+            BigDecimal randomMultiplier = minPrice
+                    .add(new BigDecimal(Math.random()).multiply(maxPrice.subtract(minPrice)))
+                    .setScale(8, RoundingMode.HALF_UP);
+            BigDecimal finalPrice = randomPrice.multiply(randomMultiplier).setScale(8, RoundingMode.HALF_UP);
 
 
-        PlaceOrderRequest orders = new PlaceOrderRequest();
-        orders.setProductId(product.getId());
-        orders.setClientOid(UUID.randomUUID().toString());
-        orders.setPrice(String.valueOf(randomPrice));
-        orders.setSize(String.valueOf(randomSize));
-        orders.setType("limit");
-        orders.setFunds(String.valueOf(new Random().nextInt(10) + 1));
-        orders.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
+            PlaceOrderRequest orders = new PlaceOrderRequest();
+            orders.setProductId(product.getId());
+       //     orders.setClientOid(UUID.randomUUID().toString());
+            orders.setPrice(String.valueOf(finalPrice.add(randomPrice)));
+            orders.setSize(String.valueOf(randomSize));
+            orders.setType("limit");
+            orders.setFunds(String.valueOf(new Random().nextInt(10) + 1));
+            orders.setSide(new Random().nextBoolean() ? "BUY" : "SELL");
+         //   orders.setSpread(product.getSpread());
 
-        String objectAsString = user.toString();
-       orderController.placeOrder(orders, objectAsString);
+            String objectAsString = user.toString();
+            orderController.placeOrder(orders, objectAsString,product.getSpread());
         } catch (Exception e) {
             e.printStackTrace();
         }}
@@ -196,7 +286,7 @@ public class CoinbaseTrader {
         private String reason;
     }
 
-    public class MyClient extends org.java_websocket.client.WebSocketClient {
+    public class MyClient extends WebSocketClient {
         private final User user;
 
         public MyClient(URI serverUri, User user) {
@@ -208,8 +298,8 @@ public class CoinbaseTrader {
         public void onOpen(ServerHandshake serverHandshake) {
             logger.info("open");
 
-           send("{\"type\":\"subscribe\",\"product_ids\":[\"BTC-USD\"],\"channels\":[\"full\"],\"token\":\"\"}");
-  //       send("{\"type\":\"subscribe\",\"product_ids\":[\"BCD-USD\"],\"channels\":[\"full\"],\"token\":\"\"}");
+            send("{\"type\":\"subscribe\",\"product_ids\":[\"BTC-USD\"],\"channels\":[\"full\"],\"token\":\"\"}");
+            //       send("{\"type\":\"subscribe\",\"product_ids\":[\"BCD-USD\"],\"channels\":[\"full\"],\"token\":\"\"}");
 
         }
 

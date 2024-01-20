@@ -28,6 +28,7 @@ public class Order implements Cloneable {
     private String productId;
     private OrderStatus status;
     private String clientOid;
+    private BigDecimal spread;
 
     public Order() {
     }
@@ -39,6 +40,7 @@ public class Order implements Cloneable {
         this.type = command.getOrderType();
         this.side = command.getOrderSide();
         this.price = command.getPrice();
+        this.spread = command.getSpread();
         this.size = command.getSize();
         if (command.getOrderType() == OrderType.LIMIT) {
             this.funds = command.getSize().multiply(command.getPrice());

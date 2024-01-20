@@ -51,13 +51,13 @@ public class OrderBook {
 
         takerOrder.setSequence(++orderSequence);
 
-        if (takerOrder.getSide() == OrderSide.BUY) {
-            accountBook.hold(takerOrder.getUserId(), product.getQuoteCurrency(), takerOrder.getRemainingFunds(),
-                    modifiedObjects);
-        } else {
-            accountBook.hold(takerOrder.getUserId(), product.getBaseCurrency(), takerOrder.getRemainingSize(),
-                    modifiedObjects);
-        }
+//        if (takerOrder.getSide() == OrderSide.BUY) {
+//            accountBook.hold(takerOrder.getUserId(), product.getQuoteCurrency(), takerOrder.getRemainingFunds(),
+//                    modifiedObjects);
+//        } else {
+//            accountBook.hold(takerOrder.getUserId(), product.getBaseCurrency(), takerOrder.getRemainingSize(),
+//                    modifiedObjects);
+//        }
 //        if (modifiedObjects.isEmpty()) {
 //            logger.warn("order rejected, reason: INSUFFICIENT_FUNDS: {}", JSON.toJSONString(takerOrder));
 //            takerOrder.setStatus(OrderStatus.REJECTED);
@@ -197,7 +197,7 @@ public class OrderBook {
         trade.setSequence(++tradeSequence);
         trade.setProductId(productId);
         trade.setSize(tradeSize);
-        trade.setFunds(tradeFunds);
+        trade.setFunds(makerOrder.getFunds());
         trade.setPrice(price);
         trade.setSide(makerOrder.getSide());
         trade.setTime(takerOrder.getTime());
@@ -212,16 +212,34 @@ public class OrderBook {
         orderById.put(order.getId(), order);
     }
 
+
+
     private boolean isPriceCrossed(Order takerOrder, BigDecimal makerOrderPrice) {
         if (takerOrder.getType() == OrderType.MARKET) {
             return true;
         }
-        if (takerOrder.getSide() == OrderSide.BUY) {
-            return takerOrder.getPrice().compareTo(makerOrderPrice) >= 100;
+
+        BigDecimal spreadNumber;
+
+        // Check if takerOrder.getSpread() is null
+        if (takerOrder.getSpread() == null) {
+            logger.info("spread value is missing in taker order");
+            return false;
         } else {
-            return takerOrder.getPrice().compareTo(makerOrderPrice) <= 100;
+            BigDecimal spreadBigDecimal = takerOrder.getSpread();
+            BigDecimal spread = spreadBigDecimal.abs();  // Ensure spread is non-negative
+            spread=spread.divide(BigDecimal.valueOf(2));
+            spreadNumber = takerOrder.getPrice().subtract(makerOrderPrice);
+
+            if (takerOrder.getSide() == OrderSide.BUY) {
+                return spreadNumber.compareTo(BigDecimal.ZERO) >= 0 && spreadNumber.compareTo(spread) < 0;
+            } else {
+                return spreadNumber.compareTo(spread.negate()) > 0 && spreadNumber.compareTo(BigDecimal.ZERO) <= 0;
+            }
         }
     }
+
+
 
     private void unholdOrderFunds(Order makerOrder, Product product, ModifiedObjectList modifiedObjects) {
         if (makerOrder.getSide() == OrderSide.BUY) {

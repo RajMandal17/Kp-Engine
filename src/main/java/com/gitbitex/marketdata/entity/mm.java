@@ -21,8 +21,10 @@ public class mm {
     private int baseScale;
     private int quoteScale;
     private float quoteIncrement;
-
+    private BigDecimal maxPriceRatio;
+    private BigDecimal minPriceRatio;
     private BigDecimal orderSizeMin;
     private BigDecimal orderSizeMax;
     private BigDecimal spread;
+    private int mmPriceCronTime;
 }

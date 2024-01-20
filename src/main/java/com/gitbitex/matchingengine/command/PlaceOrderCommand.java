@@ -21,7 +21,7 @@ public class PlaceOrderCommand extends Command {
     private OrderSide orderSide;
     private Date time;
     private String last_trade_id;
-
+    private BigDecimal spread;
     public PlaceOrderCommand() {
         this.setType(CommandType.PLACE_ORDER);
     }
