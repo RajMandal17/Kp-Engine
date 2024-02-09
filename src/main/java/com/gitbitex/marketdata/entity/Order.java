@@ -18,6 +18,7 @@ public class Order {
     private long sequence;
     private String productId;
     private String userId;
+    private String Role;
     private String clientOid;
     private Date time;
     private BigDecimal size;

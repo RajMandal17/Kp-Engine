@@ -14,6 +14,7 @@ public class PlaceOrderCommand extends Command {
     private String productId;
     private String orderId;
     private String userId;
+    private String clientOid;
     private BigDecimal size;
     private BigDecimal price;
     private BigDecimal funds;

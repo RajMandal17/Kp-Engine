@@ -10,6 +10,7 @@ import java.util.Date;
 @Getter
 @Setter
 public class TradeEmit {
+    private String tradeEmitId;
     private String productId;
     private long sequence;
     private BigDecimal size;

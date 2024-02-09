@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -137,7 +138,7 @@ public class ModifiedObjectWriter implements EngineListener {
                     modifiedObjectSavedCounter.increment();
                 });
 
-                // Check if the API is reachable
+                // Check if the API is reachable - https://knprklvtrdkand.koinpark.com/order/fillapi_webhook
                 if (isApiReachable("http://localhost:3000/api/tradehistory")) {
                     RestTemplate restTemplate = new RestTemplate();
                     HttpHeaders headers = new HttpHeaders();
@@ -197,6 +198,7 @@ public class ModifiedObjectWriter implements EngineListener {
     private TradeEmit TradeEmitDto(Trade trade) {
 
         TradeEmit tradeEmit = new TradeEmit();
+        tradeEmit.setTradeEmitId(UUID.randomUUID().toString());
         tradeEmit.setProductId(trade.getProductId());
         tradeEmit.setSize(trade.getSize());
         tradeEmit.setPrice(trade.getPrice());

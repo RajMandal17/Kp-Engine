@@ -35,6 +35,7 @@ public class Order implements Cloneable {
     public Order(PlaceOrderCommand command) {
         this.productId = command.getProductId();
         this.userId = command.getUserId();
+        this.clientOid = command.getClientOid();
         this.id = command.getOrderId();
         this.type = command.getOrderType();
         this.side = command.getOrderSide();

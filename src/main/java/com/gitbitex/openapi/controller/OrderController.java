@@ -68,6 +68,7 @@ public class OrderController {
         command.setProductId(request.getProductId());
         command.setOrderId(UUID.randomUUID().toString());
         command.setUserId(id.toString());
+    //    command.setClientOid(request.getClientOid());
         command.setOrderType(type);
         command.setOrderSide(side);
         command.setSize(size);
@@ -107,12 +108,10 @@ public class OrderController {
         orderDto.setSide(String.valueOf(command.getOrderSide()));
         orderDto.setTimeInForce(request.getTimeInForce());
         orderDto.setStatus("new");
-       orderDto.setSettled(msg.isSettled());
+        orderDto.setSettled(msg.isSettled());
         return orderDto;
     }
 
-
-//    
     @GetMapping("/orderstatus/{orderId}")
     public ResponseEntity<Object> orderList(@PathVariable String orderId) {
         Order order = orderRepository.findByOrderId(orderId);
@@ -132,9 +131,13 @@ public class OrderController {
         if (order == null) {
             return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
         }
+        if (order.getStatus().equals(OrderStatus.FILLED)) {
+
+            return ResponseEntity.badRequest().body(new OrderCancellationResponse("success", "Already filled"));
+        }
         if (order.getStatus().equals(OrderStatus.CANCELLED)) {
 
-            return ResponseEntity.badRequest().body(new OrderCancellationResponse("failed", "cancelled"));
+            return ResponseEntity.badRequest().body(new OrderCancellationResponse("success", "Already cancelled"));
         }else {
 
             order.setStatus(OrderStatus.CANCELLED);
